@@ -14,13 +14,21 @@
 #include "events/danger.h"
 #include "events/enemies.h"
 #include "events/enemy_kills.h"
-#include "events/chase_boo.h"
+#include "events/chase_1up.h"
 #include "events/skateboard.h"
 #include "events/chaos.h"
 #include "events/action_triggers.h"
 #include "events/splat.h"
 #include "events/clingy.h"
 #include "events/hit_reactions.h"
+#include "events/roulette.h"
+#include "events/controls.h"
+#include "events/wind.h"
+#include "events/mini_mario.h"
+#include "events/cannon.h"
+#include "events/magnetism.h"
+#include "events/kaizo.h"
+#include "events/cam.h"
 
 #define RDEV_COIN_BONUS      0
 #define RDEV_COIN_PENALTY    1
@@ -46,9 +54,20 @@
 #define RDEV_GRAVITY_HEAVY  21
 #define RDEV_SLIPPERY       22
 #define RDEV_NUH_UH         23
-#define RDEV_COUNT          24
+#define RDEV_HP_ROULETTE    24
+#define RDEV_COIN_ROULETTE  25
+#define RDEV_REV_CONTROLS   26
+#define RDEV_SLOWMO         27
+#define RDEV_HIGHSPEED      28
+#define RDEV_WIND           29
+#define RDEV_MINI_MARIO     30
+#define RDEV_MAGNETISM      31
+#define RDEV_CAM_TOPDOWN    32
+#define RDEV_CAM_DJI        33
+#define RDEV_FPS_MARIO      34
+#define RDEV_COUNT          35
 
-// Damage/death events are intentionally low (1-2). Total = 156.
+// Damage/death events are intentionally low (1-2). Total = 208.
 static const int kWeights[RDEV_COUNT] = {
     18, /* COIN_BONUS     */
     16, /* COIN_PENALTY   */
@@ -74,9 +93,20 @@ static const int kWeights[RDEV_COUNT] = {
      5, /* GRAVITY_HEAVY  */
      1, /* SLIPPERY       */
      7, /* NUH_UH         */
+     4, /* HP_ROULETTE    */
+     5, /* COIN_ROULETTE  */
+     5, /* REV_CONTROLS   */
+     6, /* SLOWMO         */
+     5, /* HIGHSPEED      */
+     6, /* WIND           */
+     4, /* MINI_MARIO     */
+     5, /* MAGNETISM      */
+     5, /* CAM_TOPDOWN    */
+     4, /* CAM_DJI        */
+     3, /* FPS_MARIO      */
 };
 
-#define WEIGHT_TOTAL 156
+#define WEIGHT_TOTAL 208
 
 static const char *kMessages[RDEV_COUNT] = {
     "COIN BONUS",
@@ -97,12 +127,23 @@ static const char *kMessages[RDEV_COUNT] = {
     "OUCH",
     "YOU DIED",
     "GAME OVER",
-    "GHOST HUNT",
+    "GREEN DEMON",
     "SKATEBOARD",
     "LOW GRAVITY",
     "HEAVY",
     "ICY FLOORS",
     "NUH UH",
+    "HP ROULETTE",
+    "COIN ROULETTE",
+    "BACKWARDS",
+    "SLOW DOWN",
+    "TURBO",
+    "WIND",
+    "MINI MARIO",
+    "MAGNETISM",
+    "TOP DOWN",
+    "DJI CAM",
+    "FPS MARIO",
 };
 
 #define INTERVAL_MIN   1200 // 40 seconds
@@ -157,12 +198,23 @@ static void fire_event(int type) {
         case RDEV_HEALTH_DAMAGE:  do_health_damage(m);  break;
         case RDEV_LOSE_LIFE:      do_lose_life(m);      break;
         case RDEV_GAME_OVER:      do_game_over(m);      break;
-        case RDEV_CHASE_BOO:      do_chase_boo(m);      break;
+        case RDEV_CHASE_BOO:      do_chase_1up(m);      break;
         case RDEV_SKATEBOARD:     do_skateboard(m);     break;
         case RDEV_GRAVITY_LIGHT:  do_gravity_light(m);  break;
         case RDEV_GRAVITY_HEAVY:  do_gravity_heavy(m);  break;
         case RDEV_SLIPPERY:       do_slippery(m);       break;
         case RDEV_NUH_UH:         do_nuh_uh(m);         break;
+        case RDEV_HP_ROULETTE:    do_hp_roulette(m);    break;
+        case RDEV_COIN_ROULETTE:  do_coin_roulette(m);  break;
+        case RDEV_REV_CONTROLS:   do_rev_controls(m);   break;
+        case RDEV_SLOWMO:         do_slowmo(m);         break;
+        case RDEV_HIGHSPEED:      do_highspeed(m);      break;
+        case RDEV_WIND:           do_wind(m);           break;
+        case RDEV_MINI_MARIO:     do_mini_mario(m);     break;
+        case RDEV_MAGNETISM:      do_magnetism(m);      break;
+        case RDEV_CAM_TOPDOWN:    do_topdown(m);        break;
+        case RDEV_CAM_DJI:        do_djicam(m);         break;
+        case RDEV_FPS_MARIO:      do_fpsmario(m);       break;
     }
     sDisplayMsg   = kMessages[type];
     sDisplayTimer = DISPLAY_FRAMES;
@@ -179,9 +231,14 @@ static void on_timer_update(IEvent *event) {
     struct MarioState *m = gMarioState;
 
     tick_movement_states(m);
-    tick_chase_boo(m);
+    tick_chase_1up(m);
     tick_skateboard(m);
     tick_chaos(m);
+    tick_roulette(m);
+    tick_controls(m);
+    tick_wind(m);
+    tick_mini_mario(m);
+    tick_magnetism(m);
 
     sFrameCount++;
     sRandState ^= (unsigned int)sFrameCount * 2654435761u;
@@ -211,6 +268,8 @@ static void on_action_tick(IEvent *event) {
     tick_splat(m);
     tick_clingy(m);
     tick_hit_reactions(m);
+    tick_cannon(m);
+    tick_kaizo(m);
 }
 
 static void on_render_labels(IEvent *event) {
@@ -238,9 +297,14 @@ MOD_INIT() {
     sTextListenerID   = REGISTER_LISTENER(RenderTextLabels, EVENT_PRIORITY_NORMAL, on_render_labels);
     register_action_triggers();
     register_enemy_kills();
+    register_chase_1up();
     register_splat();
     register_clingy();
     register_hit_reactions();
+    register_mini_mario();
+    register_cannon();
+    register_kaizo();
+    register_cam();
 }
 
 MOD_EXIT() {
@@ -250,7 +314,12 @@ MOD_EXIT() {
     UNREGISTER_LISTENER(RenderTextLabels, sTextListenerID);
     unregister_action_triggers();
     unregister_enemy_kills();
+    unregister_chase_1up();
     unregister_splat();
     unregister_clingy();
     unregister_hit_reactions();
+    unregister_mini_mario();
+    unregister_cannon();
+    unregister_kaizo();
+    unregister_cam();
 }
