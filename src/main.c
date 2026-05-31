@@ -18,6 +18,9 @@
 #include "events/skateboard.h"
 #include "events/chaos.h"
 #include "events/action_triggers.h"
+#include "events/splat.h"
+#include "events/clingy.h"
+#include "events/hit_reactions.h"
 
 #define RDEV_COIN_BONUS      0
 #define RDEV_COIN_PENALTY    1
@@ -176,6 +179,9 @@ static void on_frame_update(IEvent *event) {
     tick_skateboard(m);
     tick_chaos(m);
     tick_action_triggers(m);
+    tick_splat(m);
+    tick_clingy(m);
+    tick_hit_reactions(m);
 
     sFrameCount++;
     sRandState ^= (unsigned int)sFrameCount * 2654435761u;
@@ -219,6 +225,9 @@ MOD_INIT() {
     sTextListenerID  = REGISTER_LISTENER(RenderTextLabels, EVENT_PRIORITY_NORMAL, on_render_labels);
     register_action_triggers();
     register_enemy_kills();
+    register_splat();
+    register_clingy();
+    register_hit_reactions();
 }
 
 MOD_EXIT() {
@@ -227,4 +236,7 @@ MOD_EXIT() {
     UNREGISTER_LISTENER(RenderTextLabels, sTextListenerID);
     unregister_action_triggers();
     unregister_enemy_kills();
+    unregister_splat();
+    unregister_clingy();
+    unregister_hit_reactions();
 }
