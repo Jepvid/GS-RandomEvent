@@ -1,0 +1,10 @@
+{
+    "name": "Random Events",
+    "main": "build.gen",
+    "version": "1.0.0",
+    "description": "Random gameplay events that help or hinder the player, from coin bonuses to rare game overs.",
+    "website": "https://github.com/Jepvid/GS-RandomEvent",
+    "author": "Reppan",
+    "license": "MIT",
+    "code-version": 1
+}
