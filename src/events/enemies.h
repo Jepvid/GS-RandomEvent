@@ -4,17 +4,14 @@
 #include "game/object_helpers.h"
 #include "behavior_data.h"
 
-// Requires: rng.h, sm64.h (MarioState, Vec3f), model_ids.h
-
-// Spawns 2-4 random enemies in a ring around Mario.
 static void do_spawn_enemy(struct MarioState *m) {
     if (!m->marioObj) return;
 
-    // Enemy pool: goombas, koopas, bob-ombs (model = buddy but behavior = hostile)
+    // Bob-ombs use the buddy model but the hostile behavior script.
     static const struct { u32 model; const BehaviorScript *bhv; } kEnemies[] = {
-        { MODEL_GOOMBA,          bhvGoomba },
-        { MODEL_KOOPA_WITH_SHELL, bhvKoopa },
-        { MODEL_BOBOMB_BUDDY,    bhvBobomb },
+        { MODEL_GOOMBA,           bhvGoomba },
+        { MODEL_KOOPA_WITH_SHELL, bhvKoopa  },
+        { MODEL_BOBOMB_BUDDY,     bhvBobomb },
     };
     static const int kEnemyCount = 3;
 

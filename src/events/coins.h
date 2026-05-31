@@ -1,8 +1,6 @@
 #ifndef RE_EVENTS_COINS_H
 #define RE_EVENTS_COINS_H
 
-// Requires: rng.h, sm64.h (MarioState)
-
 static void do_coin_bonus(struct MarioState *m) {
     int n = rng_range(5, 20);
     m->numCoins += (s16)n;

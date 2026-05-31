@@ -8,18 +8,16 @@
 
 #include "rng.h"
 #include "events/coins.h"
-#include "events/movement.h"       // do_narcolepsy, do_fire, do_squish, ..., tick_movement_states
+#include "events/movement.h"
 #include "events/health.h"
 #include "events/caps.h"
 #include "events/danger.h"
-#include "events/enemies.h"        // do_spawn_enemy
-#include "events/enemy_kills.h"    // ObjectDestroyed listener (5% explosion)
-#include "events/chase_boo.h"      // do_chase_boo, tick_chase_boo
-#include "events/skateboard.h"     // do_skateboard, tick_skateboard
-#include "events/chaos.h"          // do_gravity_light/heavy, do_slippery, tick_chaos
-#include "events/action_triggers.h" // PlayerSetAction listener
-
-// ---- Event type IDs ----
+#include "events/enemies.h"
+#include "events/enemy_kills.h"
+#include "events/chase_boo.h"
+#include "events/skateboard.h"
+#include "events/chaos.h"
+#include "events/action_triggers.h"
 
 #define RDEV_COIN_BONUS      0
 #define RDEV_COIN_PENALTY    1
@@ -47,39 +45,36 @@
 #define RDEV_NUH_UH         23
 #define RDEV_COUNT          24
 
-// Higher = more frequent. Total = 156.
-// Dangerous events (damage / death) are kept at weight 1-2.
-// Slippery is weight 1 — too disruptive at higher frequency.
+// Damage/death events are intentionally low (1-2). Total = 156.
 static const int kWeights[RDEV_COUNT] = {
-    18, /* COIN_BONUS      common    */
-    16, /* COIN_PENALTY    common    */
-    10, /* SPEED_BOOST     common    */
-     8, /* LAUNCH_UP       common    */
-     8, /* SQUISH          common    */
-     8, /* INVINC          common    */
-     8, /* HEAL_TWO        common    */
-     8, /* CAP_WING        common    */
-     6, /* CAP_METAL       uncommon  */
-     6, /* CAP_VANISH      uncommon  */
-     6, /* NARCOLEPSY      uncommon  */
-     6, /* FIRE            uncommon  */
-     6, /* SPAWN_ENEMY     uncommon  */
-     4, /* SPEED_REVERSE   uncommon  */
-     4, /* FULL_HEAL       uncommon  */
-     2, /* HEALTH_DAMAGE   rare      */
-     1, /* LOSE_LIFE       rare      */
-     1, /* GAME_OVER       very rare */
-     5, /* CHASE_BOO       uncommon  */
-     6, /* SKATEBOARD      uncommon  */
-     6, /* GRAVITY_LIGHT   uncommon  */
-     5, /* GRAVITY_HEAVY   uncommon  */
-     1, /* SLIPPERY        very rare */
-     7, /* NUH_UH          uncommon  */
+    18, /* COIN_BONUS     */
+    16, /* COIN_PENALTY   */
+    10, /* SPEED_BOOST    */
+     8, /* LAUNCH_UP      */
+     8, /* SQUISH         */
+     8, /* INVINC         */
+     8, /* HEAL_TWO       */
+     8, /* CAP_WING       */
+     6, /* CAP_METAL      */
+     6, /* CAP_VANISH     */
+     6, /* NARCOLEPSY     */
+     6, /* FIRE           */
+     6, /* SPAWN_ENEMY    */
+     4, /* SPEED_REVERSE  */
+     4, /* FULL_HEAL      */
+     2, /* HEALTH_DAMAGE  */
+     1, /* LOSE_LIFE      */
+     1, /* GAME_OVER      */
+     5, /* CHASE_BOO      */
+     6, /* SKATEBOARD     */
+     6, /* GRAVITY_LIGHT  */
+     5, /* GRAVITY_HEAVY  */
+     1, /* SLIPPERY       */
+     7, /* NUH_UH         */
 };
 
 #define WEIGHT_TOTAL 156
 
-// SM64 HUD font: A-Z, 0-9, space, limited punctuation.
 static const char *kMessages[RDEV_COUNT] = {
     "COIN BONUS",
     "COIN PENALTY",
@@ -107,25 +102,17 @@ static const char *kMessages[RDEV_COUNT] = {
     "NUH UH",
 };
 
-// Events fire every 40-100 seconds (1200-3000 frames at 30fps).
-#define INTERVAL_MIN 1200
-#define INTERVAL_MAX 3000
-// Message stays on screen for 4 seconds (120 frames).
-#define DISPLAY_FRAMES 120
-
-// ---- Listener handles ----
+#define INTERVAL_MIN   1200 // 40 seconds
+#define INTERVAL_MAX   3000 // 100 seconds
+#define DISPLAY_FRAMES  120 // 4 seconds
 
 static ListenerID sFrameListenerID;
 static ListenerID sTextListenerID;
-
-// ---- Runtime state ----
 
 static int sFrameCount   = 0;
 static int sNextEvent    = 0;
 static int sDisplayTimer = 0;
 static const char *sDisplayMsg = NULL;
-
-// ---- Helpers ----
 
 static int pick_event(void) {
     int roll = (int)(rng_next() % (unsigned int)WEIGHT_TOTAL);
@@ -175,8 +162,6 @@ static void fire_event(int type) {
     sDisplayTimer = DISPLAY_FRAMES;
 }
 
-// ---- Listeners ----
-
 static void on_frame_update(IEvent *event) {
     if (!CVarGetInteger("gRandomEvents.Enabled", 1)) {
         sDisplayTimer = 0;
@@ -186,14 +171,13 @@ static void on_frame_update(IEvent *event) {
 
     struct MarioState *m = gMarioState;
 
-    // Sustain ongoing effects every frame.
     tick_movement_states(m);
     tick_chase_boo(m);
     tick_skateboard(m);
     tick_chaos(m);
+    tick_action_triggers(m);
 
     sFrameCount++;
-    // Stir RNG so trigger timing affects randomness.
     sRandState ^= (unsigned int)sFrameCount * 2654435761u;
 
     if (sNextEvent == 0)
@@ -201,7 +185,6 @@ static void on_frame_update(IEvent *event) {
 
     if (sFrameCount >= sNextEvent) {
         int type = pick_event();
-        // Never game-over if on the last life.
         if (type == RDEV_GAME_OVER && m->numLives <= 0)
             type = RDEV_SQUISH;
         fire_event(type);
@@ -215,9 +198,9 @@ static void on_frame_update(IEvent *event) {
 static void on_render_labels(IEvent *event) {
     if (sDisplayTimer > 0 && sDisplayMsg)
         print_text_centered(160, 140, sDisplayMsg);
+    if (sChaseWarning)
+        print_text_centered(160, 165, sChaseWarning);
 }
-
-// ---- UI ----
 
 static void setup_ui(void) {
     C_AddSidebarEntry("Random Events", 1);
@@ -229,8 +212,6 @@ static void setup_ui(void) {
     en.opts.checkbox.default_val = true;
     C_AddWidget("Random Events", 1, "Enable", &en);
 }
-
-// ---- Entry points ----
 
 MOD_INIT() {
     setup_ui();

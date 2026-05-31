@@ -1,8 +1,6 @@
 #ifndef RE_EVENTS_DANGER_H
 #define RE_EVENTS_DANGER_H
 
-// Requires: game/level_update.h (level_trigger_warp, WARP_OP_*)
-
 static void do_lose_life(struct MarioState *m) {
     level_trigger_warp(m, WARP_OP_DEATH);
 }

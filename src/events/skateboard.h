@@ -4,12 +4,9 @@
 #include "game/object_helpers.h"
 #include "behavior_data.h"
 
-// Requires: sm64.h (MarioState, ACT_RIDING_SHELL_GROUND, ACT_FLAG_RIDING_SHELL),
-//           game/mario.h (set_mario_action), behavior_data.h (bhvKoopaShell)
+#define SKATE_DURATION 300 // 10 seconds
 
-#define SKATE_DURATION 300  // 10 seconds at 30fps
-
-static int sSkateTimer = 0;
+static int            sSkateTimer = 0;
 static struct Object *sSkateShell = NULL;
 
 static void do_skateboard(struct MarioState *m) {
@@ -31,7 +28,6 @@ static void do_skateboard(struct MarioState *m) {
 static void tick_skateboard(struct MarioState *m) {
     if (sSkateTimer <= 0) return;
 
-    // If the shell was removed or Mario dismounted, force him back on.
     if (!sSkateShell || !(sSkateShell->oFlags & ACTIVE_FLAG_ACTIVE)) {
         sSkateShell = NULL;
         sSkateTimer = 0;
@@ -46,9 +42,8 @@ static void tick_skateboard(struct MarioState *m) {
     sSkateTimer--;
 
     if (sSkateTimer == 0) {
-        // Release Mario from the shell naturally.
         m->riddenObj = NULL;
-        sSkateShell = NULL;
+        sSkateShell  = NULL;
     }
 }
 
