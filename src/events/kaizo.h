@@ -3,7 +3,18 @@
 
 #include "game/object_helpers.h"
 #include "behavior_data.h"
+#include "behavior_macros.h"
+#include "object_constants.h"
 #include "engine/math_util.h"
+
+// Minimal behavior: exists in OBJ_LIST_DEFAULT, updates its gfx position, does nothing else.
+// All gameplay logic (proximity bonk, coin, despawn) is handled by tick_kaizo.
+static const BehaviorScript bhvKaizoBlock[] = {
+    BEGIN(OBJ_LIST_DEFAULT),
+    OR_INT(oFlags, OBJ_FLAG_UPDATE_GFX_POS_AND_ANGLE),
+    BEGIN_LOOP(),
+    END_LOOP(),
+};
 
 #define KAIZO_VISIBLE_FRAMES  90
 #define KAIZO_BLOCK_RADIUS    80.0f
@@ -24,7 +35,7 @@ static void on_jump_kaizo(IEvent *event) {
     if (sKaizoBlock && (sKaizoBlock->oFlags & ACTIVE_FLAG_ACTIVE)) return;
     if (sKaizoSpawnDelay > 0) return;
     if (rng_next() % 20 != 0) return; // ~5%
-    sKaizoSpawnDelay = rng_range(17, 23);
+    sKaizoSpawnDelay = rng_range(3, 10);
 }
 
 static void tick_kaizo(struct MarioState *m) {
@@ -38,14 +49,12 @@ static void tick_kaizo(struct MarioState *m) {
                 f32 fwdZ = coss(m->faceAngle[1]) * 50.0f;
                 sKaizoBlock = spawn_object_abs_with_rot(
                     m->marioObj, 0,
-                    MODEL_EXCLAMATION_BOX, bhvExclamationBox,
+                    MODEL_EXCLAMATION_BOX, bhvKaizoBlock,
                     (s16)(m->pos[0] + fwdX),
                     (s16)(m->pos[1] + KAIZO_SPAWN_HEIGHT),
                     (s16)(m->pos[2] + fwdZ),
                     0, 0, 0
                 );
-                if (sKaizoBlock)
-                    sKaizoBlock->oBehParams2ndByte = 3; // bypass cap-switch check, go solid immediately
                 sKaizoTimer = KAIZO_VISIBLE_FRAMES;
             }
         }

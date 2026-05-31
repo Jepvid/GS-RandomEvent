@@ -147,7 +147,7 @@ static const char *kMessages[RDEV_COUNT] = {
     "FPS MARIO",
 };
 
-#define INTERVAL_MIN   1200 // 40 seconds
+#define INTERVAL_MIN    300 // 10 seconds
 #define INTERVAL_MAX   3600 // 120 seconds
 #define DISPLAY_FRAMES  120 // 4 seconds
 
@@ -228,6 +228,13 @@ static void on_timer_update(IEvent *event) {
         sDisplayTimer = 0;
         return;
     }
+
+    // Advance unconditionally so intangible states (bonks, deaths, cutscenes) don't stall the timer.
+    sFrameCount++;
+    sRandState ^= (unsigned int)sFrameCount * 2654435761u;
+    if (sDisplayTimer > 0)
+        sDisplayTimer--;
+
     if (!is_in_game()) return;
 
     struct MarioState *m = gMarioState;
@@ -242,9 +249,6 @@ static void on_timer_update(IEvent *event) {
     tick_mini_mario(m);
     tick_magnetism(m);
 
-    sFrameCount++;
-    sRandState ^= (unsigned int)sFrameCount * 2654435761u;
-
     if (sNextEvent == 0)
         sNextEvent = sFrameCount + rng_range(INTERVAL_MIN, INTERVAL_MAX);
 
@@ -255,9 +259,6 @@ static void on_timer_update(IEvent *event) {
         fire_event(type);
         sNextEvent = sFrameCount + rng_range(INTERVAL_MIN, INTERVAL_MAX);
     }
-
-    if (sDisplayTimer > 0)
-        sDisplayTimer--;
 }
 
 // Runs at LOW priority (after timer) — ticks action-triggered sustained effects.
