@@ -103,7 +103,7 @@ static const char *kMessages[RDEV_COUNT] = {
 };
 
 #define INTERVAL_MIN   1200 // 40 seconds
-#define INTERVAL_MAX   3000 // 100 seconds
+#define INTERVAL_MAX   3600 // 120 seconds
 #define DISPLAY_FRAMES  120 // 4 seconds
 
 static ListenerID sFrameListenerID;
