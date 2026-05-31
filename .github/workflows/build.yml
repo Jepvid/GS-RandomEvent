@@ -11,9 +11,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: write   # required to create GitHub Releases
-
     steps:
       - name: Checkout Mod Repository
         uses: actions/checkout@v4
@@ -72,19 +69,3 @@ jobs:
           name: ${{ steps.meta.outputs.project_name }}
           path: Ghostship/workspace/mod-source/signed-output/
           retention-days: 7
-
-      - name: Read Mod Version
-        if: github.event_name != 'pull_request'
-        id: version
-        run: |
-          VERSION=$(python3 -c "import json; print(json.load(open('Ghostship/workspace/mod-source/manifest.json'))['version'])")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Publish Release
-        if: github.event_name != 'pull_request'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: ${{ steps.meta.outputs.project_name }} v${{ steps.version.outputs.version }}
-          files: Ghostship/workspace/mod-source/signed-output/**
-          make_latest: true
