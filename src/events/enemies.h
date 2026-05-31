@@ -2,6 +2,7 @@
 #define RE_EVENTS_ENEMIES_H
 
 #include "game/object_helpers.h"
+#include "game/object_list_processor.h"
 #include "game/interaction.h"
 #include "behavior_macros.h"
 #include "object_constants.h"

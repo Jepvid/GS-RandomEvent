@@ -2,6 +2,7 @@
 #define RE_EVENTS_KAIZO_H
 
 #include "game/object_helpers.h"
+#include "game/object_list_processor.h"
 #include "behavior_data.h"
 #include "behavior_macros.h"
 #include "object_constants.h"
