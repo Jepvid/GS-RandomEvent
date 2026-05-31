@@ -12,7 +12,8 @@
 // All gameplay logic (proximity bonk, coin, despawn) is handled by tick_kaizo.
 static const BehaviorScript bhvKaizoBlock[] = {
     BEGIN(OBJ_LIST_DEFAULT),
-    OR_INT(oFlags, OBJ_FLAG_UPDATE_GFX_POS_AND_ANGLE),
+    // OR_INT(oFlags, ...) — oFlags raw index is 0x01; avoid OBJECT_FIELD macro in BehaviorScript context
+    BC_BBH(0x11, 0x01, OBJ_FLAG_UPDATE_GFX_POS_AND_ANGLE),
     BEGIN_LOOP(),
     END_LOOP(),
 };

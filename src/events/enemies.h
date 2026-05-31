@@ -33,8 +33,9 @@ static void bhv_chaos_enemy_loop(void) {
 
 static const BehaviorScript bhvChaosEnemy[] = {
     BEGIN(OBJ_LIST_PUSHABLE),
-    OR_INT(oFlags, OBJ_FLAG_COMPUTE_ANGLE_TO_MARIO | OBJ_FLAG_COMPUTE_DIST_TO_MARIO |
-                   OBJ_FLAG_SET_FACE_YAW_TO_MOVE_YAW | OBJ_FLAG_UPDATE_GFX_POS_AND_ANGLE),
+    // OR_INT(oFlags, ...) — oFlags raw index is 0x01; avoid OBJECT_FIELD macro in BehaviorScript context
+    BC_BBH(0x11, 0x01, OBJ_FLAG_COMPUTE_ANGLE_TO_MARIO | OBJ_FLAG_COMPUTE_DIST_TO_MARIO |
+                       OBJ_FLAG_SET_FACE_YAW_TO_MOVE_YAW | OBJ_FLAG_UPDATE_GFX_POS_AND_ANGLE),
     DROP_TO_FLOOR(),
     BEGIN_LOOP(),
     CALL_NATIVE(bhv_chaos_enemy_loop),
