@@ -109,7 +109,10 @@ static const char *kMessages[RDEV_COUNT] = {
 #define INTERVAL_MAX   3600 // 120 seconds
 #define DISPLAY_FRAMES  120 // 4 seconds
 
-static ListenerID sFrameListenerID;
+// Two separate GameFrameUpdate listeners so timer events and action-triggered events
+// run independently and cannot block each other.
+static ListenerID sTimerListenerID;
+static ListenerID sActionListenerID;
 static ListenerID sTextListenerID;
 
 static int sFrameCount   = 0;
@@ -165,7 +168,8 @@ static void fire_event(int type) {
     sDisplayTimer = DISPLAY_FRAMES;
 }
 
-static void on_frame_update(IEvent *event) {
+// Runs at NORMAL priority — advances the event timer and ticks timer-based sustained effects.
+static void on_timer_update(IEvent *event) {
     if (!CVarGetInteger("gRandomEvents.Enabled", 1)) {
         sDisplayTimer = 0;
         return;
@@ -178,10 +182,6 @@ static void on_frame_update(IEvent *event) {
     tick_chase_boo(m);
     tick_skateboard(m);
     tick_chaos(m);
-    tick_action_triggers(m);
-    tick_splat(m);
-    tick_clingy(m);
-    tick_hit_reactions(m);
 
     sFrameCount++;
     sRandState ^= (unsigned int)sFrameCount * 2654435761u;
@@ -199,6 +199,18 @@ static void on_frame_update(IEvent *event) {
 
     if (sDisplayTimer > 0)
         sDisplayTimer--;
+}
+
+// Runs at LOW priority (after timer) — ticks action-triggered sustained effects.
+// Uses a lighter gate so these effects survive brief intangible frames.
+static void on_action_tick(IEvent *event) {
+    if (!gMarioState) return;
+    struct MarioState *m = gMarioState;
+
+    tick_action_triggers(m);
+    tick_splat(m);
+    tick_clingy(m);
+    tick_hit_reactions(m);
 }
 
 static void on_render_labels(IEvent *event) {
@@ -221,8 +233,9 @@ static void setup_ui(void) {
 
 MOD_INIT() {
     setup_ui();
-    sFrameListenerID = REGISTER_LISTENER(GameFrameUpdate,  EVENT_PRIORITY_NORMAL, on_frame_update);
-    sTextListenerID  = REGISTER_LISTENER(RenderTextLabels, EVENT_PRIORITY_NORMAL, on_render_labels);
+    sTimerListenerID  = REGISTER_LISTENER(GameFrameUpdate,  EVENT_PRIORITY_NORMAL, on_timer_update);
+    sActionListenerID = REGISTER_LISTENER(GameFrameUpdate,  EVENT_PRIORITY_LOW,    on_action_tick);
+    sTextListenerID   = REGISTER_LISTENER(RenderTextLabels, EVENT_PRIORITY_NORMAL, on_render_labels);
     register_action_triggers();
     register_enemy_kills();
     register_splat();
@@ -232,7 +245,8 @@ MOD_INIT() {
 
 MOD_EXIT() {
     C_RemoveSidebarEntry("Random Events");
-    UNREGISTER_LISTENER(GameFrameUpdate,  sFrameListenerID);
+    UNREGISTER_LISTENER(GameFrameUpdate,  sTimerListenerID);
+    UNREGISTER_LISTENER(GameFrameUpdate,  sActionListenerID);
     UNREGISTER_LISTENER(RenderTextLabels, sTextListenerID);
     unregister_action_triggers();
     unregister_enemy_kills();
