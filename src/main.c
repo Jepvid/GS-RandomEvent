@@ -5,6 +5,7 @@
 #include "game/print.h"
 #include "sm64.h"
 #include "port/api/ui.h"
+#include "log/luslog.h"
 
 #include "rng.h"
 #include "events/coins.h"
@@ -216,6 +217,7 @@ static void fire_event(int type) {
         case RDEV_CAM_DJI:        do_djicam(m);         break;
         case RDEV_FPS_MARIO:      do_fpsmario(m);       break;
     }
+    LUSLOG_INFO("[RandomEvent] %s", kMessages[type]);
     sDisplayMsg   = kMessages[type];
     sDisplayTimer = DISPLAY_FRAMES;
 }

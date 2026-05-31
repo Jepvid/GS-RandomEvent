@@ -24,7 +24,7 @@ static void on_jump_kaizo(IEvent *event) {
     if (sKaizoBlock && (sKaizoBlock->oFlags & ACTIVE_FLAG_ACTIVE)) return;
     if (sKaizoSpawnDelay > 0) return;
     if (rng_next() % 20 != 0) return; // ~5%
-    sKaizoSpawnDelay = rng_range(8, 14);
+    sKaizoSpawnDelay = rng_range(17, 23);
 }
 
 static void tick_kaizo(struct MarioState *m) {
@@ -44,6 +44,8 @@ static void tick_kaizo(struct MarioState *m) {
                     (s16)(m->pos[2] + fwdZ),
                     0, 0, 0
                 );
+                if (sKaizoBlock)
+                    sKaizoBlock->oBehParams2ndByte = 3; // bypass cap-switch check, go solid immediately
                 sKaizoTimer = KAIZO_VISIBLE_FRAMES;
             }
         }
@@ -67,6 +69,8 @@ static void tick_kaizo(struct MarioState *m) {
             dy > -40.0f && dy < 80.0f) {
             m->vel[1] = -12.0f;
             set_mario_action(m, ACT_SOFT_BONK, 0);
+            spawn_object_abs_with_rot(m->marioObj, 0, MODEL_YELLOW_COIN, bhvYellowCoin,
+                (s16)sKaizoBlock->oPosX, (s16)sKaizoBlock->oPosY, (s16)sKaizoBlock->oPosZ, 0, 0, 0);
         }
     }
 
