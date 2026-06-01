@@ -6,6 +6,7 @@ static void do_lose_life(struct MarioState *m) {
 }
 
 static void do_game_over(struct MarioState *m) {
+    m->numLives = 0;
     level_trigger_warp(m, WARP_OP_GAME_OVER);
 }
 

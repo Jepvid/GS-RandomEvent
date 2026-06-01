@@ -26,7 +26,6 @@ static void tick_freeze(struct MarioState *m) {
     m->vel[1]      = 0.0f;
     m->vel[2]      = 0.0f;
     m->forwardVel  = 0.0f;
-    m->input       = 0;
     m->intendedMag = 0.0f;
 
     // Freeze animation in place.

@@ -35,6 +35,7 @@
 #include "events/kaizo.h"
 #include "events/cam.h"
 #include "events/freeze.h"
+#include "events/shuffle_input.h"
 
 #define RDEV_COIN_BONUS      0
 #define RDEV_COIN_PENALTY    1
@@ -72,7 +73,8 @@
 #define RDEV_CAM_DJI        33
 #define RDEV_FPS_MARIO      34
 #define RDEV_FREEZE         35
-#define RDEV_COUNT          36
+#define RDEV_SHUFFLE        36
+#define RDEV_COUNT          37
 
 // Normal-difficulty base weights. Damage/death events are intentionally low (1-2).
 static const int kWeights[RDEV_COUNT] = {
@@ -112,6 +114,7 @@ static const int kWeights[RDEV_COUNT] = {
      4, /* CAM_DJI        */
      3, /* FPS_MARIO      */
      7, /* FREEZE         */
+     8, /* SHUFFLE        */
 };
 
 // Harm level per event: 0=peaceful, 1=annoying, 2=harmful, 3=destructive
@@ -152,6 +155,7 @@ static const int kHarmLevel[RDEV_COUNT] = {
     1, /* CAM_DJI        */
     1, /* FPS_MARIO      */
     1, /* FREEZE         */
+    1, /* SHUFFLE        */
 };
 
 // Multipliers per harm level per difficulty. Pure Chaos uses weight 1 for all events.
@@ -200,6 +204,7 @@ static const char *kMessages[RDEV_COUNT] = {
     "DJI CAM",
     "FPS MARIO",
     "FREEZE",
+    "SHUFFLED",
 };
 
 #define INTERVAL_MIN_DEFAULT   10  // seconds
@@ -291,6 +296,7 @@ static void fire_event(int type) {
         case RDEV_CAM_DJI:        do_djicam(m);         break;
         case RDEV_FPS_MARIO:      do_fpsmario(m);       break;
         case RDEV_FREEZE:         do_freeze(m);         break;
+        case RDEV_SHUFFLE:        do_shuffle_input(m);  break;
     }
     LUSLOG_INFO("[RandomEvent] %s", kMessages[type]);
     sDisplayMsg   = kMessages[type];
@@ -298,17 +304,23 @@ static void fire_event(int type) {
 }
 
 // Advances the event timer and ticks sustained effects.
-// Fires after controller is read but before action code — safest place to block input.
+// Fires after controller is read — zeros all inputs except start during blocking effects.
 static void on_block_input(IEvent *event) {
     (void)event;
     if (!gMarioState || !gMarioState->controller) return;
-    if (!is_in_game()) return;
     if (sNarcolepsy <= 0 && sFreezeTimer <= 0 && sSplatFreeze <= 0) return;
     struct Controller *c = gMarioState->controller;
     c->stickX        = 0.0f;
     c->stickY        = 0.0f;
     c->buttonDown    &= START_BUTTON;
     c->buttonPressed &= START_BUTTON;
+}
+
+static void on_shuffle_input(IEvent *event) {
+    (void)event;
+    if (!gMarioState || !gMarioState->controller) return;
+    if (sNarcolepsy > 0 || sFreezeTimer > 0 || sSplatFreeze > 0) return; // blocking takes priority
+    apply_shuffle_input(gMarioState->controller);
 }
 
 static void on_timer_update(IEvent *event) {
@@ -331,8 +343,6 @@ static void on_timer_update(IEvent *event) {
     if (sPendingDebugEvent >= 0 && !is_in_castle()) {
         int type = sPendingDebugEvent;
         sPendingDebugEvent = -1;
-        if (type == RDEV_GAME_OVER && m->numLives <= 0)
-            type = RDEV_SQUISH;
         fire_event(type);
     } else if (sPendingDebugEvent >= 0 && is_in_castle()) {
         sPendingDebugEvent = -1; // discard silently
@@ -364,8 +374,6 @@ static void on_timer_update(IEvent *event) {
 
     if (sFrameCount >= sNextEvent && !is_in_castle()) {
         int type = pick_event();
-        if (type == RDEV_GAME_OVER && m->numLives <= 0)
-            type = RDEV_SQUISH;
         fire_event(type);
         sNextEvent = sFrameCount + rng_range(iMin, iMax);
     }
@@ -416,7 +424,7 @@ DEF_EVENT_FIRE(15) DEF_EVENT_FIRE(16) DEF_EVENT_FIRE(17) DEF_EVENT_FIRE(18) DEF_
 DEF_EVENT_FIRE(20) DEF_EVENT_FIRE(21) DEF_EVENT_FIRE(22) DEF_EVENT_FIRE(23) DEF_EVENT_FIRE(24)
 DEF_EVENT_FIRE(25) DEF_EVENT_FIRE(26) DEF_EVENT_FIRE(27) DEF_EVENT_FIRE(28) DEF_EVENT_FIRE(29)
 DEF_EVENT_FIRE(30) DEF_EVENT_FIRE(31) DEF_EVENT_FIRE(32) DEF_EVENT_FIRE(33) DEF_EVENT_FIRE(34)
-DEF_EVENT_FIRE(35)
+DEF_EVENT_FIRE(35) DEF_EVENT_FIRE(36)
 #undef DEF_EVENT_FIRE
 
 static void (*const kDebugFire[RDEV_COUNT])(void) = {
@@ -427,7 +435,7 @@ static void (*const kDebugFire[RDEV_COUNT])(void) = {
     re_fire_20, re_fire_21, re_fire_22, re_fire_23, re_fire_24,
     re_fire_25, re_fire_26, re_fire_27, re_fire_28, re_fire_29,
     re_fire_30, re_fire_31, re_fire_32, re_fire_33, re_fire_34,
-    re_fire_35,
+    re_fire_35, re_fire_36,
 };
 #endif
 
@@ -495,6 +503,7 @@ MOD_INIT() {
     sActionListenerID     = REGISTER_LISTENER(GameFrameUpdate,  EVENT_PRIORITY_LOW,    on_action_tick);
     sTextListenerID       = REGISTER_LISTENER(RenderTextLabels, EVENT_PRIORITY_NORMAL, on_render_labels);
     sInputBlockListenerID = REGISTER_LISTENER(GameReadInput,    EVENT_PRIORITY_LOW,    on_block_input);
+    REGISTER_LISTENER(GameReadInput, EVENT_PRIORITY_LOW, on_shuffle_input);
     register_action_triggers();
     register_enemy_kills();
     register_chase_1up();
