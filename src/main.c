@@ -389,6 +389,7 @@ DEF_EVENT_FIRE(15) DEF_EVENT_FIRE(16) DEF_EVENT_FIRE(17) DEF_EVENT_FIRE(18) DEF_
 DEF_EVENT_FIRE(20) DEF_EVENT_FIRE(21) DEF_EVENT_FIRE(22) DEF_EVENT_FIRE(23) DEF_EVENT_FIRE(24)
 DEF_EVENT_FIRE(25) DEF_EVENT_FIRE(26) DEF_EVENT_FIRE(27) DEF_EVENT_FIRE(28) DEF_EVENT_FIRE(29)
 DEF_EVENT_FIRE(30) DEF_EVENT_FIRE(31) DEF_EVENT_FIRE(32) DEF_EVENT_FIRE(33) DEF_EVENT_FIRE(34)
+DEF_EVENT_FIRE(35)
 #undef DEF_EVENT_FIRE
 
 static void (*const kDebugFire[RDEV_COUNT])(void) = {
@@ -399,6 +400,7 @@ static void (*const kDebugFire[RDEV_COUNT])(void) = {
     re_fire_20, re_fire_21, re_fire_22, re_fire_23, re_fire_24,
     re_fire_25, re_fire_26, re_fire_27, re_fire_28, re_fire_29,
     re_fire_30, re_fire_31, re_fire_32, re_fire_33, re_fire_34,
+    re_fire_35,
 };
 #endif
 
