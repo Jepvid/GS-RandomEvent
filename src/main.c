@@ -214,8 +214,6 @@ static int sNextEvent    = 0;
 static int sDisplayTimer = 0;
 static const char *sDisplayMsg = NULL;
 static int sPendingDebugEvent = -1;
-static int sIntervalSliderMin = INTERVAL_MIN_DEFAULT;
-static int sIntervalSliderMax = INTERVAL_MAX_DEFAULT;
 
 static int get_event_weight(int type) {
     int diff = CVarGetInteger("gRandomEvents.Difficulty", 2);
@@ -377,21 +375,6 @@ static const C_ComboboxOption kDiffOptions[] = {
     { 0, NULL         },
 };
 
-// Draws interval sliders with dynamic constraints in settings menu.
-static void draw_interval_sliders(void) {
-    sIntervalSliderMin = CVarGetInteger("gRandomEvents.MinInterval", INTERVAL_MIN_DEFAULT);
-    sIntervalSliderMax = CVarGetInteger("gRandomEvents.MaxInterval", INTERVAL_MAX_DEFAULT);
-
-    if (igSliderInt("Min Interval##slider", &sIntervalSliderMin, 10, sIntervalSliderMax, "%ds", 0)) {
-        if (sIntervalSliderMin > sIntervalSliderMax) sIntervalSliderMin = sIntervalSliderMax;
-        CVarSetInteger("gRandomEvents.MinInterval", sIntervalSliderMin);
-    }
-
-    if (igSliderInt("Max Interval##slider", &sIntervalSliderMax, sIntervalSliderMin, 300, "%ds", 0)) {
-        if (sIntervalSliderMax < sIntervalSliderMin) sIntervalSliderMax = sIntervalSliderMin;
-        CVarSetInteger("gRandomEvents.MaxInterval", sIntervalSliderMax);
-    }
-}
 
 #ifdef RE_DEBUG
 static void re_debug_fire_event(int idx) {
@@ -441,10 +424,27 @@ static void setup_ui(void) {
     sep1.type = C_WIDGET_SEPARATOR_TEXT;
     C_AddWidget("Random Events", 1, "Timer", &sep1);
 
-    C_WidgetConfig intervalS = {0};
-    intervalS.type     = C_WIDGET_SEPARATOR;
-    intervalS.pre_func = draw_interval_sliders;
-    C_AddWidget("Random Events", 1, "", &intervalS);
+    C_WidgetConfig minS = {0};
+    minS.type = C_WIDGET_CVAR_SLIDER_INT;
+    minS.cvar = "gRandomEvents.MinInterval";
+    minS.opts.slider_int.min = 10;
+    minS.opts.slider_int.max = 300;
+    minS.opts.slider_int.step = 5;
+    minS.opts.slider_int.default_val = INTERVAL_MIN_DEFAULT;
+    minS.opts.slider_int.format = "%ds";
+    minS.opts.slider_int.tooltip = "Minimum time between random events.";
+    C_AddWidget("Random Events", 1, "Min Interval", &minS);
+
+    C_WidgetConfig maxS = {0};
+    maxS.type = C_WIDGET_CVAR_SLIDER_INT;
+    maxS.cvar = "gRandomEvents.MaxInterval";
+    maxS.opts.slider_int.min = 10;
+    maxS.opts.slider_int.max = 300;
+    maxS.opts.slider_int.step = 5;
+    maxS.opts.slider_int.default_val = INTERVAL_MAX_DEFAULT;
+    maxS.opts.slider_int.format = "%ds";
+    maxS.opts.slider_int.tooltip = "Maximum time between random events.";
+    C_AddWidget("Random Events", 1, "Max Interval", &maxS);
 
 #ifdef RE_DEBUG
     C_WidgetConfig sep2 = {0};
