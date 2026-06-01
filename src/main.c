@@ -108,7 +108,7 @@ static const int kWeights[RDEV_COUNT] = {
      6, /* WIND           */
      4, /* MINI_MARIO     */
      5, /* MAGNETISM      */
-     5, /* CAM_TOPDOWN    */
+     0, /* CAM_TOPDOWN    */
      4, /* CAM_DJI        */
      3, /* FPS_MARIO      */
      7, /* FREEZE         */
@@ -210,6 +210,7 @@ static const char *kMessages[RDEV_COUNT] = {
 static ListenerID sTimerListenerID;
 static ListenerID sActionListenerID;
 static ListenerID sTextListenerID;
+static ListenerID sInputBlockListenerID;
 
 static int sFrameCount   = 0;
 static int sNextEvent    = 0;
@@ -297,6 +298,20 @@ static void fire_event(int type) {
 }
 
 // Advances the event timer and ticks sustained effects.
+// Fires after controller is read but before action code — safest place to block input.
+static void on_block_input(IEvent *event) {
+    (void)event;
+    if (!gMarioState || !gMarioState->controller) return;
+    if (!is_in_game()) return;
+    if (sNarcolepsy <= 0 && sFreezeTimer <= 0 && sSplatFreeze <= 0) return;
+    struct Controller *c = gMarioState->controller;
+    u16 start = c->buttonDown & START_BUTTON; // preserve start button
+    c->stickX        = 0.0f;
+    c->stickY        = 0.0f;
+    c->buttonDown    = start;
+    c->buttonPressed = start;
+}
+
 static void on_timer_update(IEvent *event) {
     if (!CVarGetInteger("gRandomEvents.Enabled", 1)) {
         sDisplayTimer = 0;
@@ -477,9 +492,10 @@ static void setup_ui(void) {
 
 MOD_INIT() {
     setup_ui();
-    sTimerListenerID  = REGISTER_LISTENER(GameFrameUpdate,  EVENT_PRIORITY_NORMAL, on_timer_update);
-    sActionListenerID = REGISTER_LISTENER(GameFrameUpdate,  EVENT_PRIORITY_LOW,    on_action_tick);
-    sTextListenerID   = REGISTER_LISTENER(RenderTextLabels, EVENT_PRIORITY_NORMAL, on_render_labels);
+    sTimerListenerID      = REGISTER_LISTENER(GameFrameUpdate,  EVENT_PRIORITY_NORMAL, on_timer_update);
+    sActionListenerID     = REGISTER_LISTENER(GameFrameUpdate,  EVENT_PRIORITY_LOW,    on_action_tick);
+    sTextListenerID       = REGISTER_LISTENER(RenderTextLabels, EVENT_PRIORITY_NORMAL, on_render_labels);
+    sInputBlockListenerID = REGISTER_LISTENER(GameReadInput,    EVENT_PRIORITY_HIGH,   on_block_input);
     register_action_triggers();
     register_enemy_kills();
     register_chase_1up();
@@ -497,6 +513,7 @@ MOD_EXIT() {
     UNREGISTER_LISTENER(GameFrameUpdate,  sTimerListenerID);
     UNREGISTER_LISTENER(GameFrameUpdate,  sActionListenerID);
     UNREGISTER_LISTENER(RenderTextLabels, sTextListenerID);
+    UNREGISTER_LISTENER(GameReadInput,    sInputBlockListenerID);
     unregister_action_triggers();
     unregister_enemy_kills();
     unregister_chase_1up();
