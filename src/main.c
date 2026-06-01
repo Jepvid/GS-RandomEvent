@@ -366,7 +366,7 @@ static const C_ComboboxOption kDiffOptions[] = {
     { 0, NULL         },
 };
 
-// Raw ImGui sliders with dynamic range constraints.
+// Draws interval sliders with dynamic constraints in settings menu.
 static void draw_interval_sliders(void) {
     sIntervalSliderMin = CVarGetInteger("gRandomEvents.MinInterval", INTERVAL_MIN_DEFAULT);
     sIntervalSliderMax = CVarGetInteger("gRandomEvents.MaxInterval", INTERVAL_MAX_DEFAULT);
@@ -437,8 +437,10 @@ static void setup_ui(void) {
     sep1.type = C_WIDGET_SEPARATOR_TEXT;
     C_AddWidget("Random Events", 1, "Timer", &sep1);
 
-    // Interval sliders are drawn with raw ImGui to allow dynamic range constraints.
-    C_AddGuiDraw(draw_interval_sliders);
+    C_WidgetConfig intervalS = {0};
+    intervalS.type     = C_WIDGET_CUSTOM;
+    intervalS.callback = draw_interval_sliders;
+    C_AddWidget("Random Events", 1, "Intervals", &intervalS);
 
 #ifdef RE_DEBUG
     C_WidgetConfig sep2 = {0};
