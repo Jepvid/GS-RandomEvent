@@ -1,6 +1,7 @@
 #include "mod.h"
 #include "port/events/Events.h"
 #include "game/level_update.h"
+#include "game/area.h"
 #include "game/mario.h"
 #include "game/print.h"
 #include "sm64.h"
@@ -242,6 +243,12 @@ static int is_in_game(void) {
         && !(gMarioState->action & ACT_FLAG_INTANGIBLE);
 }
 
+static int is_in_castle(void) {
+    return gCurrLevelNum == LEVEL_CASTLE
+        || gCurrLevelNum == LEVEL_CASTLE_GROUNDS
+        || gCurrLevelNum == LEVEL_CASTLE_COURTYARD;
+}
+
 static void fire_event(int type) {
     struct MarioState *m = gMarioState;
     switch (type) {
@@ -305,12 +312,14 @@ static void on_timer_update(IEvent *event) {
     struct MarioState *m = gMarioState;
 
 #ifdef RE_DEBUG
-    if (sPendingDebugEvent >= 0) {
+    if (sPendingDebugEvent >= 0 && !is_in_castle()) {
         int type = sPendingDebugEvent;
         sPendingDebugEvent = -1;
         if (type == RDEV_GAME_OVER && m->numLives <= 0)
             type = RDEV_SQUISH;
         fire_event(type);
+    } else if (sPendingDebugEvent >= 0 && is_in_castle()) {
+        sPendingDebugEvent = -1; // discard silently
     }
 #endif
 
@@ -337,7 +346,7 @@ static void on_timer_update(IEvent *event) {
     if (sNextEvent == 0)
         sNextEvent = sFrameCount + rng_range(iMin, iMax);
 
-    if (sFrameCount >= sNextEvent) {
+    if (sFrameCount >= sNextEvent && !is_in_castle()) {
         int type = pick_event();
         if (type == RDEV_GAME_OVER && m->numLives <= 0)
             type = RDEV_SQUISH;
