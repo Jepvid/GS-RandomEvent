@@ -77,7 +77,8 @@ static void tick_kaizo(struct MarioState *m) {
         f32 adz = dz < 0.0f ? -dz : dz;
         if (adx < KAIZO_BLOCK_RADIUS && adz < KAIZO_BLOCK_RADIUS &&
             dy > -40.0f && dy < 80.0f) {
-            m->vel[1] = -12.0f;
+            m->vel[1] = -20.0f;
+            m->forwardVel = 0.0f;
             set_mario_action(m, ACT_SOFT_BONK, 0);
             spawn_object_abs_with_rot(m->marioObj, 0, MODEL_YELLOW_COIN, bhvYellowCoin,
                 (s16)sKaizoBlock->oPosX, (s16)sKaizoBlock->oPosY, (s16)sKaizoBlock->oPosZ, 0, 0, 0);

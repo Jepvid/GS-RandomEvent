@@ -3,6 +3,7 @@
 #include "game/level_update.h"
 #include "game/area.h"
 #include "game/mario.h"
+#include "level_table.h"
 #include "game/print.h"
 #include "sm64.h"
 #include "port/api/ui.h"
