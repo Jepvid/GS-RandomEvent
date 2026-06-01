@@ -7,6 +7,8 @@
 #include "port/api/ui.h"
 #include "log/luslog.h"
 
+#define RE_DEBUG  // uncomment to enable debug UI in settings
+
 #include "rng.h"
 #include "events/coins.h"
 #include "events/movement.h"
@@ -30,6 +32,7 @@
 #include "events/magnetism.h"
 #include "events/kaizo.h"
 #include "events/cam.h"
+#include "events/freeze.h"
 
 #define RDEV_COIN_BONUS      0
 #define RDEV_COIN_PENALTY    1
@@ -49,7 +52,7 @@
 #define RDEV_HEALTH_DAMAGE  15
 #define RDEV_LOSE_LIFE      16
 #define RDEV_GAME_OVER      17
-#define RDEV_CHASE_BOO      18
+#define RDEV_GREEN_DEMON    18
 #define RDEV_SKATEBOARD     19
 #define RDEV_GRAVITY_LIGHT  20
 #define RDEV_GRAVITY_HEAVY  21
@@ -66,9 +69,10 @@
 #define RDEV_CAM_TOPDOWN    32
 #define RDEV_CAM_DJI        33
 #define RDEV_FPS_MARIO      34
-#define RDEV_COUNT          35
+#define RDEV_FREEZE         35
+#define RDEV_COUNT          36
 
-// Damage/death events are intentionally low (1-2). Total = 208.
+// Normal-difficulty base weights. Damage/death events are intentionally low (1-2).
 static const int kWeights[RDEV_COUNT] = {
     18, /* COIN_BONUS     */
     16, /* COIN_PENALTY   */
@@ -88,7 +92,7 @@ static const int kWeights[RDEV_COUNT] = {
      2, /* HEALTH_DAMAGE  */
      1, /* LOSE_LIFE      */
      1, /* GAME_OVER      */
-     5, /* CHASE_BOO      */
+     5, /* GREEN_DEMON    */
      6, /* SKATEBOARD     */
      6, /* GRAVITY_LIGHT  */
      5, /* GRAVITY_HEAVY  */
@@ -105,9 +109,57 @@ static const int kWeights[RDEV_COUNT] = {
      5, /* CAM_TOPDOWN    */
      4, /* CAM_DJI        */
      3, /* FPS_MARIO      */
+     7, /* FREEZE         */
 };
 
-#define WEIGHT_TOTAL 208
+// Harm level per event: 0=peaceful, 1=annoying, 2=harmful, 3=destructive
+static const int kHarmLevel[RDEV_COUNT] = {
+    0, /* COIN_BONUS     */
+    1, /* COIN_PENALTY   */
+    0, /* SPEED_BOOST    */
+    0, /* LAUNCH_UP      */
+    1, /* SQUISH         */
+    0, /* INVINC         */
+    0, /* HEAL_TWO       */
+    0, /* CAP_WING       */
+    0, /* CAP_METAL      */
+    0, /* CAP_VANISH     */
+    1, /* NARCOLEPSY     */
+    2, /* FIRE           */
+    2, /* SPAWN_ENEMY    */
+    1, /* SPEED_REVERSE  */
+    0, /* FULL_HEAL      */
+    2, /* HEALTH_DAMAGE  */
+    3, /* LOSE_LIFE      */
+    3, /* GAME_OVER      */
+    2, /* GREEN_DEMON      */
+    0, /* SKATEBOARD     */
+    0, /* GRAVITY_LIGHT  */
+    1, /* GRAVITY_HEAVY  */
+    1, /* SLIPPERY       */
+    1, /* NUH_UH         */
+    2, /* HP_ROULETTE    */
+    1, /* COIN_ROULETTE  */
+    1, /* REV_CONTROLS   */
+    0, /* SLOWMO         */
+    0, /* HIGHSPEED      */
+    1, /* WIND           */
+    2, /* MINI_MARIO     */
+    1, /* MAGNETISM      */
+    1, /* CAM_TOPDOWN    */
+    1, /* CAM_DJI        */
+    1, /* FPS_MARIO      */
+    1, /* FREEZE         */
+};
+
+// Multipliers per harm level per difficulty. Pure Chaos uses weight 1 for all events.
+static const int kDiffScale[5][4] = {
+    { 3, 0, 0, 0 }, // 0 Peaceful
+    { 2, 1, 0, 0 }, // 1 Easy
+    { 1, 1, 1, 1 }, // 2 Normal
+    { 1, 2, 4, 2 }, // 3 Hard
+    { 1, 1, 1, 1 }, // 4 Pure Chaos (handled in get_event_weight)
+};
 
 static const char *kMessages[RDEV_COUNT] = {
     "COIN BONUS",
@@ -115,11 +167,11 @@ static const char *kMessages[RDEV_COUNT] = {
     "SPEED BOOST",
     "LAUNCH",
     "SQUISHED",
-    "INVINCIBLE",
+    "STAR POWER",
     "HEALED",
     "WING CAP",
     "METAL CAP",
-    "VANISH CAP",
+    "GHOST CAP",
     "ZZZ",
     "HOT HOT HOT",
     "WATCH OUT",
@@ -127,11 +179,11 @@ static const char *kMessages[RDEV_COUNT] = {
     "FULL HEAL",
     "OUCH",
     "YOU DIED",
-    "GAME OVER",
+    "GAME END",
     "GREEN DEMON",
     "SKATEBOARD",
-    "LOW GRAVITY",
-    "HEAVY",
+    "FLOATY",
+    "CHUNKY",
     "ICY FLOORS",
     "NUH UH",
     "HP ROULETTE",
@@ -145,14 +197,14 @@ static const char *kMessages[RDEV_COUNT] = {
     "TOP DOWN",
     "DJI CAM",
     "FPS MARIO",
+    "FREEZE",
 };
 
-#define INTERVAL_MIN    300 // 10 seconds
-#define INTERVAL_MAX   3600 // 120 seconds
+#define INTERVAL_MIN_DEFAULT   10  // seconds
+#define INTERVAL_MAX_DEFAULT  120  // seconds (slider goes up to 300)
 #define DISPLAY_FRAMES  120 // 4 seconds
 
-// Two separate GameFrameUpdate listeners so timer events and action-triggered events
-// run independently and cannot block each other.
+// Two listeners so timer and action-triggered effects run independently.
 static ListenerID sTimerListenerID;
 static ListenerID sActionListenerID;
 static ListenerID sTextListenerID;
@@ -162,11 +214,22 @@ static int sNextEvent    = 0;
 static int sDisplayTimer = 0;
 static const char *sDisplayMsg = NULL;
 
+static int get_event_weight(int type) {
+    int diff = CVarGetInteger("gRandomEvents.Difficulty", 2);
+    if (diff == 4) return 1; // Pure Chaos: all events equal
+    if (diff < 0 || diff > 3) diff = 2;
+    return kWeights[type] * kDiffScale[diff][kHarmLevel[type]];
+}
+
 static int pick_event(void) {
-    int roll = (int)(rng_next() % (unsigned int)WEIGHT_TOTAL);
-    int acc = 0;
+    int total = 0;
+    for (int i = 0; i < RDEV_COUNT; i++)
+        total += get_event_weight(i);
+    if (total == 0) return 0;
+    int roll = (int)(rng_next() % (unsigned int)total);
+    int acc  = 0;
     for (int i = 0; i < RDEV_COUNT; i++) {
-        acc += kWeights[i];
+        acc += get_event_weight(i);
         if (roll < acc) return i;
     }
     return 0;
@@ -199,7 +262,7 @@ static void fire_event(int type) {
         case RDEV_HEALTH_DAMAGE:  do_health_damage(m);  break;
         case RDEV_LOSE_LIFE:      do_lose_life(m);      break;
         case RDEV_GAME_OVER:      do_game_over(m);      break;
-        case RDEV_CHASE_BOO:      do_chase_1up(m);      break;
+        case RDEV_GREEN_DEMON:      do_chase_1up(m);      break;
         case RDEV_SKATEBOARD:     do_skateboard(m);     break;
         case RDEV_GRAVITY_LIGHT:  do_gravity_light(m);  break;
         case RDEV_GRAVITY_HEAVY:  do_gravity_heavy(m);  break;
@@ -216,13 +279,14 @@ static void fire_event(int type) {
         case RDEV_CAM_TOPDOWN:    do_topdown(m);        break;
         case RDEV_CAM_DJI:        do_djicam(m);         break;
         case RDEV_FPS_MARIO:      do_fpsmario(m);       break;
+        case RDEV_FREEZE:         do_freeze(m);         break;
     }
     LUSLOG_INFO("[RandomEvent] %s", kMessages[type]);
     sDisplayMsg   = kMessages[type];
     sDisplayTimer = DISPLAY_FRAMES;
 }
 
-// Runs at NORMAL priority — advances the event timer and ticks timer-based sustained effects.
+// Advances the event timer and ticks sustained effects.
 static void on_timer_update(IEvent *event) {
     if (!CVarGetInteger("gRandomEvents.Enabled", 1)) {
         sDisplayTimer = 0;
@@ -248,21 +312,24 @@ static void on_timer_update(IEvent *event) {
     tick_wind(m);
     tick_mini_mario(m);
     tick_magnetism(m);
+    tick_freeze(m);
+
+    int iMin = CVarGetInteger("gRandomEvents.MinInterval", INTERVAL_MIN_DEFAULT) * 30;
+    int iMax = CVarGetInteger("gRandomEvents.MaxInterval", INTERVAL_MAX_DEFAULT) * 30;
 
     if (sNextEvent == 0)
-        sNextEvent = sFrameCount + rng_range(INTERVAL_MIN, INTERVAL_MAX);
+        sNextEvent = sFrameCount + rng_range(iMin, iMax);
 
     if (sFrameCount >= sNextEvent) {
         int type = pick_event();
         if (type == RDEV_GAME_OVER && m->numLives <= 0)
             type = RDEV_SQUISH;
         fire_event(type);
-        sNextEvent = sFrameCount + rng_range(INTERVAL_MIN, INTERVAL_MAX);
+        sNextEvent = sFrameCount + rng_range(iMin, iMax);
     }
 }
 
-// Runs at LOW priority (after timer) — ticks action-triggered sustained effects.
-// Uses a lighter gate so these effects survive brief intangible frames.
+// Ticks action-triggered effects; lighter gate so they survive brief intangible frames.
 static void on_action_tick(IEvent *event) {
     if (!gMarioState) return;
     struct MarioState *m = gMarioState;
@@ -282,6 +349,60 @@ static void on_render_labels(IEvent *event) {
         print_text_centered(160, 165, sChaseWarning);
 }
 
+static const C_ComboboxOption kDiffOptions[] = {
+    { 0, "Peaceful"   },
+    { 1, "Easy"       },
+    { 2, "Normal"     },
+    { 3, "Hard"       },
+    { 4, "Pure Chaos" },
+    { 0, NULL         },
+};
+
+static void on_min_interval_changed(void) {
+    int lo = CVarGetInteger("gRandomEvents.MinInterval", INTERVAL_MIN_DEFAULT);
+    int hi = CVarGetInteger("gRandomEvents.MaxInterval", INTERVAL_MAX_DEFAULT);
+    if (lo > hi) CVarSetInteger("gRandomEvents.MaxInterval", lo);
+}
+
+static void on_max_interval_changed(void) {
+    int lo = CVarGetInteger("gRandomEvents.MinInterval", INTERVAL_MIN_DEFAULT);
+    int hi = CVarGetInteger("gRandomEvents.MaxInterval", INTERVAL_MAX_DEFAULT);
+    if (hi < lo) CVarSetInteger("gRandomEvents.MinInterval", hi);
+}
+
+#ifdef RE_DEBUG
+static void re_debug_fire_event(int idx) {
+    if (!is_in_game()) return;
+    int type = idx;
+    if (type == RDEV_GAME_OVER && gMarioState->numLives <= 0)
+        type = RDEV_SQUISH;
+    fire_event(type);
+    int iMin = CVarGetInteger("gRandomEvents.MinInterval", INTERVAL_MIN_DEFAULT) * 30;
+    int iMax = CVarGetInteger("gRandomEvents.MaxInterval", INTERVAL_MAX_DEFAULT) * 30;
+    sNextEvent = sFrameCount + rng_range(iMin, iMax);
+}
+
+#define DEF_EVENT_FIRE(n) static void re_fire_##n(void) { re_debug_fire_event(n); }
+DEF_EVENT_FIRE( 0) DEF_EVENT_FIRE( 1) DEF_EVENT_FIRE( 2) DEF_EVENT_FIRE( 3) DEF_EVENT_FIRE( 4)
+DEF_EVENT_FIRE( 5) DEF_EVENT_FIRE( 6) DEF_EVENT_FIRE( 7) DEF_EVENT_FIRE( 8) DEF_EVENT_FIRE( 9)
+DEF_EVENT_FIRE(10) DEF_EVENT_FIRE(11) DEF_EVENT_FIRE(12) DEF_EVENT_FIRE(13) DEF_EVENT_FIRE(14)
+DEF_EVENT_FIRE(15) DEF_EVENT_FIRE(16) DEF_EVENT_FIRE(17) DEF_EVENT_FIRE(18) DEF_EVENT_FIRE(19)
+DEF_EVENT_FIRE(20) DEF_EVENT_FIRE(21) DEF_EVENT_FIRE(22) DEF_EVENT_FIRE(23) DEF_EVENT_FIRE(24)
+DEF_EVENT_FIRE(25) DEF_EVENT_FIRE(26) DEF_EVENT_FIRE(27) DEF_EVENT_FIRE(28) DEF_EVENT_FIRE(29)
+DEF_EVENT_FIRE(30) DEF_EVENT_FIRE(31) DEF_EVENT_FIRE(32) DEF_EVENT_FIRE(33) DEF_EVENT_FIRE(34)
+#undef DEF_EVENT_FIRE
+
+static void (*const kDebugFire[RDEV_COUNT])(void) = {
+    re_fire_0,  re_fire_1,  re_fire_2,  re_fire_3,  re_fire_4,
+    re_fire_5,  re_fire_6,  re_fire_7,  re_fire_8,  re_fire_9,
+    re_fire_10, re_fire_11, re_fire_12, re_fire_13, re_fire_14,
+    re_fire_15, re_fire_16, re_fire_17, re_fire_18, re_fire_19,
+    re_fire_20, re_fire_21, re_fire_22, re_fire_23, re_fire_24,
+    re_fire_25, re_fire_26, re_fire_27, re_fire_28, re_fire_29,
+    re_fire_30, re_fire_31, re_fire_32, re_fire_33, re_fire_34,
+};
+#endif
+
 static void setup_ui(void) {
     C_AddSidebarEntry("Random Events", 1);
 
@@ -291,6 +412,56 @@ static void setup_ui(void) {
     en.opts.checkbox.tooltip = "Enable random events during gameplay.";
     en.opts.checkbox.default_val = true;
     C_AddWidget("Random Events", 1, "Enable", &en);
+
+    C_WidgetConfig diff = {0};
+    diff.type = C_WIDGET_CVAR_COMBOBOX;
+    diff.cvar = "gRandomEvents.Difficulty";
+    diff.opts.combo.tooltip = "Peaceful: no harmful events. Easy: no damage. Normal: default. Hard: more danger. Pure Chaos: all events equally likely.";
+    diff.opts.combo.default_index = 2;
+    diff.opts.combo.map = (C_ComboboxOption*)kDiffOptions;
+    C_AddWidget("Random Events", 1, "Difficulty", &diff);
+
+    C_WidgetConfig sep1 = {0};
+    sep1.type = C_WIDGET_SEPARATOR_TEXT;
+    C_AddWidget("Random Events", 1, "Timer", &sep1);
+
+    C_WidgetConfig minS = {0};
+    minS.type = C_WIDGET_CVAR_SLIDER_INT;
+    minS.cvar = "gRandomEvents.MinInterval";
+    minS.opts.slider_int.min = 10;
+    minS.opts.slider_int.max = 300;
+    minS.opts.slider_int.step = 5;
+    minS.opts.slider_int.default_val = INTERVAL_MIN_DEFAULT;
+    minS.opts.slider_int.format = "%ds";
+    minS.opts.slider_int.tooltip = "Minimum time between random events.";
+    minS.callback = on_min_interval_changed;
+    C_AddWidget("Random Events", 1, "Min Interval", &minS);
+
+    C_WidgetConfig maxS = {0};
+    maxS.type = C_WIDGET_CVAR_SLIDER_INT;
+    maxS.cvar = "gRandomEvents.MaxInterval";
+    maxS.opts.slider_int.min = 10;
+    maxS.opts.slider_int.max = 300;
+    maxS.opts.slider_int.step = 5;
+    maxS.opts.slider_int.default_val = INTERVAL_MAX_DEFAULT;
+    maxS.opts.slider_int.format = "%ds";
+    maxS.opts.slider_int.tooltip = "Maximum time between random events.";
+    maxS.callback = on_max_interval_changed;
+    C_AddWidget("Random Events", 1, "Max Interval", &maxS);
+
+#ifdef RE_DEBUG
+    C_WidgetConfig sep2 = {0};
+    sep2.type = C_WIDGET_SEPARATOR_TEXT;
+    C_AddWidget("Random Events", 1, "Debug", &sep2);
+
+    for (int i = 0; i < RDEV_COUNT; i++) {
+        C_WidgetConfig btn = {0};
+        btn.type     = C_WIDGET_BUTTON;
+        btn.callback = kDebugFire[i];
+        btn.opts.generic.tooltip = "Fire this event immediately (must be in-game).";
+        C_AddWidget("Random Events", 1, kMessages[i], &btn);
+    }
+#endif
 }
 
 MOD_INIT() {

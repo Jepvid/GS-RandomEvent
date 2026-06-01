@@ -1,15 +1,8 @@
 #ifndef RE_EVENTS_HIT_REACTIONS_H
 #define RE_EVENTS_HIT_REACTIONS_H
 
-// Two action-triggered effects:
-//
-// DODGE (~10%): undoes the hurtCounter damage in the PlayerHit listener (fires after
-//   hurtCounter is incremented in interaction.c), cancels knockback in PlayerKnockback
-//   by overwriting *action, then teleports Mario behind the enemy and punches in the
-//   next GameFrameUpdate tick.
-//
-// SUPER KNOCKBACK (~15%): sets a pending flag in PlayerKnockback, applies a 3-8x
-//   forwardVel multiplier in tick after the KB action has been written to m->action.
+// ~10% dodge: undo hit, cancel knockback, teleport behind enemy and punch.
+// ~15% super knockback: 3-8x forwardVel multiplier applied one tick after knockback action sets.
 
 static ListenerID sHitListenerID;
 static ListenerID sKnockbackListenerID;
@@ -64,7 +57,7 @@ static void tick_hit_reactions(struct MarioState *m) {
         }
         m->pos[1]       = sDodgeSrcY;
         m->faceAngle[1] += 0x8000; // face back toward enemy
-        set_mario_action(m, ACT_PUNCHING, 0);
+        set_mario_action(m, ACT_KICKING, 0);
         sDodgePending = 0;
     }
 

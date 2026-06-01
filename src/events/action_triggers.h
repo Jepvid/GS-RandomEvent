@@ -1,16 +1,13 @@
 #ifndef RE_EVENTS_ACTION_TRIGGERS_H
 #define RE_EVENTS_ACTION_TRIGGERS_H
 
-// Velocity is applied in tick_action_triggers (GameFrameUpdate) rather than in the
-// listener because PlayerSetAction fires before action init, which would overwrite us.
+// Velocity set in tick (not listener) because PlayerSetAction fires before action init.
 
-// Backflip: normal vel[1] base is 62.0f. Range 100-700 covers "woops" to "absurd".
 static int sBackflipCount     = 0;
 static int sBackflipThreshold = 10;
 static int sPendingBackflip   = 0;
 static f32 sPendingBackflipVel = 0.0f;
 
-// Long jump: normal forwardVel cap is 48.0f. Range 80-500 covers "woops" to "absurd".
 static int sLongJumpCount      = 0;
 static int sLongJumpThreshold  = 10;
 static int sPendingLongJump    = 0;

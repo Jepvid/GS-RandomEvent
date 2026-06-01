@@ -3,8 +3,7 @@
 
 #include "game/object_helpers.h"
 
-// ~17% chance when Mario grabs a pole or tree: refuse to let go for 2-10 seconds.
-// usedObj is set before set_mario_action fires in interaction.c, so it's valid here.
+// ~17% chance on pole grab: refuse to let go for 2-10 seconds.
 
 static ListenerID    sClingyListenerID;
 static int           sClingyTimer = 0;

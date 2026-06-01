@@ -1,7 +1,7 @@
 #ifndef RE_EVENTS_HEALTH_H
 #define RE_EVENTS_HEALTH_H
 
-// SM64 health: 0x880 = full (8 pips), 0x100 = 1 pip, death below 0x100.
+// Health: 0x880 = full (8 pips), 0x100 = 1 pip.
 
 static void do_heal_two(struct MarioState *m) {
     m->health += 0x200;

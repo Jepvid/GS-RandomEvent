@@ -48,8 +48,7 @@ static void do_speed_reverse(struct MarioState *m) {
     mario_set_forward_vel(m, -50.0f);
 }
 
-// ACT_BURNING_FALL carries ACT_FLAG_INVULNERABLE — lava damage only triggers from
-// geometry contact, not from the action itself, so no health is lost.
+// ACT_BURNING_FALL is invulnerable — no health lost from the action itself.
 static void do_fire(struct MarioState *m) {
     set_mario_action(m, ACT_BURNING_FALL, 0);
     m->vel[1] = 60.0f;

@@ -8,8 +8,7 @@
 #include "object_constants.h"
 #include "engine/math_util.h"
 
-// Minimal behavior: exists in OBJ_LIST_DEFAULT, updates its gfx position, does nothing else.
-// All gameplay logic (proximity bonk, coin, despawn) is handled by tick_kaizo.
+// Minimal behavior — tick_kaizo handles all gameplay logic.
 static const BehaviorScript bhvKaizoBlock[] = {
     BEGIN(OBJ_LIST_DEFAULT),
     // OR_INT(oFlags, ...) — oFlags raw index is 0x01; avoid OBJECT_FIELD macro in BehaviorScript context
