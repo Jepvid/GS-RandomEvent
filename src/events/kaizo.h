@@ -33,6 +33,7 @@ static void on_jump_kaizo(IEvent *event) {
         act != ACT_TRIPLE_JUMP && act != ACT_LONG_JUMP &&
         act != ACT_BACKFLIP && act != ACT_SIDE_FLIP)
         return;
+    if (is_in_castle()) return;
     if (sKaizoBlock && (sKaizoBlock->oFlags & ACTIVE_FLAG_ACTIVE)) return;
     if (sKaizoSpawnDelay > 0) return;
     if (rng_next() % 20 != 0) return; // ~5%

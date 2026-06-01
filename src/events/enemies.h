@@ -6,6 +6,7 @@
 
 static void do_spawn_enemy(struct MarioState *m) {
     if (!m->marioObj) return;
+    if (is_in_castle()) return;
 
     static const struct { u32 model; const BehaviorScript *bhv; } kEnemies[] = {
         { MODEL_GOOMBA,           bhvGoomba },

@@ -43,7 +43,7 @@ static void tick_chase_1up(struct MarioState *m) {
     // Pre-spawn warning phase: delay before the 1-up appears.
     if (sChaseDelay > 0) {
         sChaseDelay--;
-        if (sChaseDelay == 0 && m->marioObj) {
+        if (sChaseDelay == 0 && m->marioObj && !is_in_castle()) {
             sChase1Up = spawn_object_abs_with_rot(
                 m->marioObj, 0, MODEL_1UP, bhvHidden1upInPole,
                 (s16)(m->pos[0] + 400.0f),

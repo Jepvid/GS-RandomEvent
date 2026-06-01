@@ -15,6 +15,7 @@ static void on_object_destroyed(IEvent *event) {
     ObjectDestroyed *e = (ObjectDestroyed *)event;
     if (!e->object || !gMarioState) return;
     if (!(e->object->oInteractType & ENEMY_INTERACT_MASK)) return;
+    if (is_in_castle()) return;
     if (rng_next() % 20 != 0) return; // ~5% chance
 
     spawn_object_abs_with_rot(
