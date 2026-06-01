@@ -213,6 +213,7 @@ static int sFrameCount   = 0;
 static int sNextEvent    = 0;
 static int sDisplayTimer = 0;
 static const char *sDisplayMsg = NULL;
+static int sPendingDebugEvent = -1;
 static int sIntervalSliderMin = INTERVAL_MIN_DEFAULT;
 static int sIntervalSliderMax = INTERVAL_MAX_DEFAULT;
 
@@ -305,6 +306,16 @@ static void on_timer_update(IEvent *event) {
 
     struct MarioState *m = gMarioState;
 
+#ifdef RE_DEBUG
+    if (sPendingDebugEvent >= 0) {
+        int type = sPendingDebugEvent;
+        sPendingDebugEvent = -1;
+        if (type == RDEV_GAME_OVER && m->numLives <= 0)
+            type = RDEV_SQUISH;
+        fire_event(type);
+    }
+#endif
+
     tick_movement_states(m);
     tick_chase_1up(m);
     tick_skateboard(m);
@@ -384,14 +395,7 @@ static void draw_interval_sliders(void) {
 
 #ifdef RE_DEBUG
 static void re_debug_fire_event(int idx) {
-    if (!is_in_game()) return;
-    int type = idx;
-    if (type == RDEV_GAME_OVER && gMarioState->numLives <= 0)
-        type = RDEV_SQUISH;
-    fire_event(type);
-    int iMin = CVarGetInteger("gRandomEvents.MinInterval", INTERVAL_MIN_DEFAULT) * 30;
-    int iMax = CVarGetInteger("gRandomEvents.MaxInterval", INTERVAL_MAX_DEFAULT) * 30;
-    sNextEvent = sFrameCount + rng_range(iMin, iMax);
+    sPendingDebugEvent = idx;
 }
 
 #define DEF_EVENT_FIRE(n) static void re_fire_##n(void) { re_debug_fire_event(n); }
@@ -438,9 +442,9 @@ static void setup_ui(void) {
     C_AddWidget("Random Events", 1, "Timer", &sep1);
 
     C_WidgetConfig intervalS = {0};
-    intervalS.type     = C_WIDGET_CUSTOM;
-    intervalS.callback = draw_interval_sliders;
-    C_AddWidget("Random Events", 1, "Intervals", &intervalS);
+    intervalS.type     = C_WIDGET_SEPARATOR;
+    intervalS.pre_func = draw_interval_sliders;
+    C_AddWidget("Random Events", 1, "", &intervalS);
 
 #ifdef RE_DEBUG
     C_WidgetConfig sep2 = {0};
