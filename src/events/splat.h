@@ -6,10 +6,8 @@
 #define SPLAT_DURATION 90
 
 static ListenerID sSplatListenerID;
-static ListenerID sSplatLandListenerID;
 static int        sSplatFreeze = 0;
 static f32        sSplatX, sSplatZ;
-static int        sSplatJustEnded = 0;
 
 static void on_action_splat(IEvent *event) {
     PlayerSetAction *e = (PlayerSetAction *)event;
@@ -19,24 +17,10 @@ static void on_action_splat(IEvent *event) {
     sSplatFreeze = SPLAT_DURATION;
     sSplatX = e->m->pos[0];
     sSplatZ = e->m->pos[2];
-    sSplatJustEnded = 0;
-}
-
-static void on_land_splat(IEvent *event) {
-    PlayerSetAction *e = (PlayerSetAction *)event;
-    if (!sSplatJustEnded) return;
-    // Force landing-on-back if splat just ended and Mario hit ground.
-    if (e->action != ACT_LAND_ON_BACK) {
-        set_mario_action(e->m, ACT_LAND_ON_BACK, 0);
-    }
-    sSplatJustEnded = 0;
 }
 
 static void tick_splat(struct MarioState *m) {
-    if (sSplatFreeze <= 0) {
-        if (sSplatFreeze == 0) sSplatJustEnded = 1;
-        return;
-    }
+    if (sSplatFreeze <= 0) return;
 
     // Pin X/Z to wall; Y falls with acceleration curve.
     m->pos[0] = sSplatX;
@@ -58,12 +42,10 @@ static void tick_splat(struct MarioState *m) {
 
 static void register_splat(void) {
     sSplatListenerID = REGISTER_LISTENER(PlayerSetAction, EVENT_PRIORITY_NORMAL, on_action_splat);
-    sSplatLandListenerID = REGISTER_LISTENER(PlayerSetAction, EVENT_PRIORITY_HIGH, on_land_splat);
 }
 
 static void unregister_splat(void) {
     UNREGISTER_LISTENER(PlayerSetAction, sSplatListenerID);
-    UNREGISTER_LISTENER(PlayerSetAction, sSplatLandListenerID);
 }
 
 #endif // RE_EVENTS_SPLAT_H
