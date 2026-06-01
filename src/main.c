@@ -103,8 +103,8 @@ static const int kWeights[RDEV_COUNT] = {
      4, /* HP_ROULETTE    */
      5, /* COIN_ROULETTE  */
      5, /* REV_CONTROLS   */
-     6, /* SLOWMO         */
-     5, /* HIGHSPEED      */
+     0, /* SLOWMO         */
+     0, /* HIGHSPEED      */
      6, /* WIND           */
      4, /* MINI_MARIO     */
      5, /* MAGNETISM      */
@@ -218,8 +218,9 @@ static const char *sDisplayMsg = NULL;
 static int sPendingDebugEvent = -1;
 
 static int get_event_weight(int type) {
+    if (kWeights[type] == 0) return 0; // always respect disabled events
     int diff = CVarGetInteger("gRandomEvents.Difficulty", 2);
-    if (diff == 4) return 1; // Pure Chaos: all events equal
+    if (diff == 4) return 1; // Pure Chaos: all enabled events equal
     if (diff < 0 || diff > 3) diff = 2;
     return kWeights[type] * kDiffScale[diff][kHarmLevel[type]];
 }

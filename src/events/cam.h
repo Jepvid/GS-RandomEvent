@@ -66,17 +66,15 @@ static void on_camera_update(IEvent *event) {
         sDjiFrames--;
 
     } else if (sFpsFrames > 0) {
-        f32 headY = m->pos[1] + 125.0f;
-        // torsoAngle adds the flip/lean from animations (triple jump, etc.)
-        s16 pitch = m->faceAngle[0] + (m->marioBodyState ? m->marioBodyState->torsoAngle[0] : 0);
-        f32 ld    = 150.0f;
+        f32 headY = m->pos[1] + 120.0f;
+        f32 ld    = 400.0f;
         cam_set(
             m->pos[0],
             headY,
             m->pos[2],
-            m->pos[0] + sins(m->faceAngle[1]) * coss(pitch) * ld,
-            headY     + sins(pitch) * ld,
-            m->pos[2] + coss(m->faceAngle[1]) * coss(pitch) * ld
+            m->pos[0] + sins(m->faceAngle[1]) * ld,
+            headY,
+            m->pos[2] + coss(m->faceAngle[1]) * ld
         );
         sFpsFrames--;
     }

@@ -19,15 +19,21 @@ static void do_freeze(struct MarioState *m) {
 static void tick_freeze(struct MarioState *m) {
     if (sFreezeTimer <= 0) return;
 
-    m->pos[0] = sFreezeX;
-    m->pos[1] = sFreezeY;
-    m->pos[2] = sFreezeZ;
-    m->vel[0] = 0.0f;
-    m->vel[1] = 0.0f;
-    m->vel[2] = 0.0f;
-    m->forwardVel = 0.0f;
-    m->input = 0;
+    m->pos[0]      = sFreezeX;
+    m->pos[1]      = sFreezeY;
+    m->pos[2]      = sFreezeZ;
+    m->vel[0]      = 0.0f;
+    m->vel[1]      = 0.0f;
+    m->vel[2]      = 0.0f;
+    m->forwardVel  = 0.0f;
+    m->input       = 0;
     m->intendedMag = 0.0f;
+
+    // Freeze animation in place.
+    if (m->marioObj) {
+        m->marioObj->header.gfx.animInfo.animAccel = 0;
+        m->marioObj->header.gfx.animInfo.animFrame = 0;
+    }
 
     sFreezeTimer--;
 }
