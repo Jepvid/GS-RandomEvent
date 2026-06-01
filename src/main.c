@@ -314,6 +314,20 @@ static void on_timer_update(IEvent *event) {
     tick_magnetism(m);
     tick_freeze(m);
 
+    // Enforce linked slider constraints: deferred from callbacks to avoid UI re-entrancy.
+    if (sMinIntervalNeedsSync) {
+        int lo = CVarGetInteger("gRandomEvents.MinInterval", INTERVAL_MIN_DEFAULT);
+        int hi = CVarGetInteger("gRandomEvents.MaxInterval", INTERVAL_MAX_DEFAULT);
+        if (lo > hi) CVarSetInteger("gRandomEvents.MaxInterval", lo);
+        sMinIntervalNeedsSync = 0;
+    }
+    if (sMaxIntervalNeedsSync) {
+        int lo = CVarGetInteger("gRandomEvents.MinInterval", INTERVAL_MIN_DEFAULT);
+        int hi = CVarGetInteger("gRandomEvents.MaxInterval", INTERVAL_MAX_DEFAULT);
+        if (hi < lo) CVarSetInteger("gRandomEvents.MinInterval", hi);
+        sMaxIntervalNeedsSync = 0;
+    }
+
     int iMin = CVarGetInteger("gRandomEvents.MinInterval", INTERVAL_MIN_DEFAULT) * 30;
     int iMax = CVarGetInteger("gRandomEvents.MaxInterval", INTERVAL_MAX_DEFAULT) * 30;
 
@@ -358,16 +372,15 @@ static const C_ComboboxOption kDiffOptions[] = {
     { 0, NULL         },
 };
 
+static int sMinIntervalNeedsSync = 0;
+static int sMaxIntervalNeedsSync = 0;
+
 static void on_min_interval_changed(void) {
-    int lo = CVarGetInteger("gRandomEvents.MinInterval", INTERVAL_MIN_DEFAULT);
-    int hi = CVarGetInteger("gRandomEvents.MaxInterval", INTERVAL_MAX_DEFAULT);
-    if (lo > hi) CVarSetInteger("gRandomEvents.MaxInterval", lo);
+    sMinIntervalNeedsSync = 1;
 }
 
 static void on_max_interval_changed(void) {
-    int lo = CVarGetInteger("gRandomEvents.MinInterval", INTERVAL_MIN_DEFAULT);
-    int hi = CVarGetInteger("gRandomEvents.MaxInterval", INTERVAL_MAX_DEFAULT);
-    if (hi < lo) CVarSetInteger("gRandomEvents.MinInterval", hi);
+    sMaxIntervalNeedsSync = 1;
 }
 
 #ifdef RE_DEBUG
