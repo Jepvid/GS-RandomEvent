@@ -213,6 +213,8 @@ static int sFrameCount   = 0;
 static int sNextEvent    = 0;
 static int sDisplayTimer = 0;
 static const char *sDisplayMsg = NULL;
+static int sMinIntervalNeedsSync = 0;
+static int sMaxIntervalNeedsSync = 0;
 
 static int get_event_weight(int type) {
     int diff = CVarGetInteger("gRandomEvents.Difficulty", 2);
@@ -371,9 +373,6 @@ static const C_ComboboxOption kDiffOptions[] = {
     { 4, "Pure Chaos" },
     { 0, NULL         },
 };
-
-static int sMinIntervalNeedsSync = 0;
-static int sMaxIntervalNeedsSync = 0;
 
 static void on_min_interval_changed(void) {
     sMinIntervalNeedsSync = 1;
