@@ -3,6 +3,7 @@
 
 #include "game/object_helpers.h"
 #include "game/object_list_processor.h"
+#include "game/interaction.h"
 #include "behavior_data.h"
 #include "behavior_macros.h"
 #include "object_constants.h"
@@ -57,6 +58,12 @@ static void tick_kaizo(struct MarioState *m) {
                     (s16)(m->pos[2] + fwdZ),
                     0, 0, 0
                 );
+                if (sKaizoBlock) {
+                    sKaizoBlock->hitboxRadius     = 60.0f;
+                    sKaizoBlock->hitboxHeight     = 60.0f;
+                    sKaizoBlock->hitboxDownOffset = 0.0f;
+                    sKaizoBlock->oInteractType    = INTERACT_BREAKABLE;
+                }
                 sKaizoTimer = KAIZO_VISIBLE_FRAMES;
             }
         }
@@ -70,20 +77,11 @@ static void tick_kaizo(struct MarioState *m) {
         return;
     }
 
-    if ((m->action & ACT_FLAG_AIR) && m->vel[1] > 0.0f) {
-        f32 dx  = m->pos[0] - sKaizoBlock->oPosX;
-        f32 dz  = m->pos[2] - sKaizoBlock->oPosZ;
-        f32 dy  = m->pos[1] - sKaizoBlock->oPosY;
-        f32 adx = dx < 0.0f ? -dx : dx;
-        f32 adz = dz < 0.0f ? -dz : dz;
-        if (adx < KAIZO_BLOCK_RADIUS && adz < KAIZO_BLOCK_RADIUS &&
-            dy > -40.0f && dy < 80.0f) {
-            m->vel[1] = -20.0f;
-            m->forwardVel = 0.0f;
-            set_mario_action(m, ACT_SOFT_BONK, 0);
-            spawn_object_abs_with_rot(m->marioObj, 0, MODEL_YELLOW_COIN, bhvYellowCoin,
-                (s16)sKaizoBlock->oPosX, (s16)sKaizoBlock->oPosY, (s16)sKaizoBlock->oPosZ, 0, 0, 0);
-        }
+    // Engine sets INT_STATUS_INTERACTED when Mario hits the block via INTERACT_BREAKABLE.
+    if (sKaizoBlock->oInteractStatus & INT_STATUS_INTERACTED) {
+        sKaizoBlock->oInteractStatus = 0; // clear so it doesn't retrigger
+        spawn_object_abs_with_rot(m->marioObj, 0, MODEL_YELLOW_COIN, bhvYellowCoin,
+            (s16)sKaizoBlock->oPosX, (s16)sKaizoBlock->oPosY, (s16)sKaizoBlock->oPosZ, 0, 0, 0);
     }
 
     sKaizoTimer--;

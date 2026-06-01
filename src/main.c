@@ -9,7 +9,7 @@
 #include "port/api/ui.h"
 #include "log/luslog.h"
 
-#define RE_DEBUG  // uncomment to enable debug UI in settings
+// #define RE_DEBUG  // uncomment to enable debug UI in settings
 
 #include "rng.h"
 #include "events/coins.h"
@@ -305,11 +305,10 @@ static void on_block_input(IEvent *event) {
     if (!is_in_game()) return;
     if (sNarcolepsy <= 0 && sFreezeTimer <= 0 && sSplatFreeze <= 0) return;
     struct Controller *c = gMarioState->controller;
-    u16 start = c->buttonDown & START_BUTTON; // preserve start button
     c->stickX        = 0.0f;
     c->stickY        = 0.0f;
-    c->buttonDown    = start;
-    c->buttonPressed = start;
+    c->buttonDown    &= START_BUTTON;
+    c->buttonPressed &= START_BUTTON;
 }
 
 static void on_timer_update(IEvent *event) {
@@ -495,7 +494,7 @@ MOD_INIT() {
     sTimerListenerID      = REGISTER_LISTENER(GameFrameUpdate,  EVENT_PRIORITY_NORMAL, on_timer_update);
     sActionListenerID     = REGISTER_LISTENER(GameFrameUpdate,  EVENT_PRIORITY_LOW,    on_action_tick);
     sTextListenerID       = REGISTER_LISTENER(RenderTextLabels, EVENT_PRIORITY_NORMAL, on_render_labels);
-    sInputBlockListenerID = REGISTER_LISTENER(GameReadInput,    EVENT_PRIORITY_HIGH,   on_block_input);
+    sInputBlockListenerID = REGISTER_LISTENER(GameReadInput,    EVENT_PRIORITY_LOW,    on_block_input);
     register_action_triggers();
     register_enemy_kills();
     register_chase_1up();
