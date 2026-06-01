@@ -213,8 +213,8 @@ static int sFrameCount   = 0;
 static int sNextEvent    = 0;
 static int sDisplayTimer = 0;
 static const char *sDisplayMsg = NULL;
-static int sMinIntervalNeedsSync = 0;
-static int sMaxIntervalNeedsSync = 0;
+static int sIntervalSliderMin = INTERVAL_MIN_DEFAULT;
+static int sIntervalSliderMax = INTERVAL_MAX_DEFAULT;
 
 static int get_event_weight(int type) {
     int diff = CVarGetInteger("gRandomEvents.Difficulty", 2);
@@ -316,22 +316,14 @@ static void on_timer_update(IEvent *event) {
     tick_magnetism(m);
     tick_freeze(m);
 
-    // Enforce linked slider constraints: deferred from callbacks to avoid UI re-entrancy.
-    if (sMinIntervalNeedsSync) {
-        int lo = CVarGetInteger("gRandomEvents.MinInterval", INTERVAL_MIN_DEFAULT);
-        int hi = CVarGetInteger("gRandomEvents.MaxInterval", INTERVAL_MAX_DEFAULT);
-        if (lo > hi) CVarSetInteger("gRandomEvents.MaxInterval", lo);
-        sMinIntervalNeedsSync = 0;
-    }
-    if (sMaxIntervalNeedsSync) {
-        int lo = CVarGetInteger("gRandomEvents.MinInterval", INTERVAL_MIN_DEFAULT);
-        int hi = CVarGetInteger("gRandomEvents.MaxInterval", INTERVAL_MAX_DEFAULT);
-        if (hi < lo) CVarSetInteger("gRandomEvents.MinInterval", hi);
-        sMaxIntervalNeedsSync = 0;
-    }
-
     int iMin = CVarGetInteger("gRandomEvents.MinInterval", INTERVAL_MIN_DEFAULT) * 30;
     int iMax = CVarGetInteger("gRandomEvents.MaxInterval", INTERVAL_MAX_DEFAULT) * 30;
+    // Silently swap if inverted (no callback to enforce constraint).
+    if (iMin > iMax) {
+        int tmp = iMin;
+        iMin = iMax;
+        iMax = tmp;
+    }
 
     if (sNextEvent == 0)
         sNextEvent = sFrameCount + rng_range(iMin, iMax);
@@ -374,12 +366,22 @@ static const C_ComboboxOption kDiffOptions[] = {
     { 0, NULL         },
 };
 
-static void on_min_interval_changed(void) {
-    sMinIntervalNeedsSync = 1;
-}
+// Raw ImGui sliders with dynamic range constraints.
+static void draw_interval_sliders(void) {
+    sIntervalSliderMin = CVarGetInteger("gRandomEvents.MinInterval", INTERVAL_MIN_DEFAULT);
+    sIntervalSliderMax = CVarGetInteger("gRandomEvents.MaxInterval", INTERVAL_MAX_DEFAULT);
 
-static void on_max_interval_changed(void) {
-    sMaxIntervalNeedsSync = 1;
+    if (ImGui::SliderInt("Min Interval##slider", &sIntervalSliderMin, 10, sIntervalSliderMax, "%ds")) {
+        if (sIntervalSliderMin > sIntervalSliderMax) sIntervalSliderMin = sIntervalSliderMax;
+        CVarSetInteger("gRandomEvents.MinInterval", sIntervalSliderMin);
+    }
+    ImGui::SetItemTooltip("Minimum time between random events (10 to %ds)", sIntervalSliderMax);
+
+    if (ImGui::SliderInt("Max Interval##slider", &sIntervalSliderMax, sIntervalSliderMin, 300, "%ds")) {
+        if (sIntervalSliderMax < sIntervalSliderMin) sIntervalSliderMax = sIntervalSliderMin;
+        CVarSetInteger("gRandomEvents.MaxInterval", sIntervalSliderMax);
+    }
+    ImGui::SetItemTooltip("Maximum time between random events (%ds to 300s)", sIntervalSliderMin);
 }
 
 #ifdef RE_DEBUG
@@ -437,29 +439,8 @@ static void setup_ui(void) {
     sep1.type = C_WIDGET_SEPARATOR_TEXT;
     C_AddWidget("Random Events", 1, "Timer", &sep1);
 
-    C_WidgetConfig minS = {0};
-    minS.type = C_WIDGET_CVAR_SLIDER_INT;
-    minS.cvar = "gRandomEvents.MinInterval";
-    minS.opts.slider_int.min = 10;
-    minS.opts.slider_int.max = 300;
-    minS.opts.slider_int.step = 5;
-    minS.opts.slider_int.default_val = INTERVAL_MIN_DEFAULT;
-    minS.opts.slider_int.format = "%ds";
-    minS.opts.slider_int.tooltip = "Minimum time between random events.";
-    minS.callback = on_min_interval_changed;
-    C_AddWidget("Random Events", 1, "Min Interval", &minS);
-
-    C_WidgetConfig maxS = {0};
-    maxS.type = C_WIDGET_CVAR_SLIDER_INT;
-    maxS.cvar = "gRandomEvents.MaxInterval";
-    maxS.opts.slider_int.min = 10;
-    maxS.opts.slider_int.max = 300;
-    maxS.opts.slider_int.step = 5;
-    maxS.opts.slider_int.default_val = INTERVAL_MAX_DEFAULT;
-    maxS.opts.slider_int.format = "%ds";
-    maxS.opts.slider_int.tooltip = "Maximum time between random events.";
-    maxS.callback = on_max_interval_changed;
-    C_AddWidget("Random Events", 1, "Max Interval", &maxS);
+    // Interval sliders are drawn with raw ImGui to allow dynamic range constraints.
+    C_AddGuiDraw(draw_interval_sliders);
 
 #ifdef RE_DEBUG
     C_WidgetConfig sep2 = {0};
