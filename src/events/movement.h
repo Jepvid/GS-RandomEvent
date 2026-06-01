@@ -72,7 +72,7 @@ static void tick_movement_states(struct MarioState *m) {
     if (sRunFrames > 0) {
         // Force Mario into a run if he's on the ground.
         if (!(m->action & ACT_FLAG_AIR) && !(m->action & ACT_FLAG_SWIMMING)) {
-            if (m->action != ACT_WALKING && m->action != ACT_RUNNING)
+            if (m->action != ACT_WALKING)
                 set_mario_action(m, ACT_WALKING, 0);
             mario_set_forward_vel(m, 48.0f);
             m->intendedYaw = m->faceAngle[1];

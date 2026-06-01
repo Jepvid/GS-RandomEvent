@@ -36,7 +36,7 @@ static void tick_wind(struct MarioState *m) {
     }
 
     // Keep Mario in a moving action so physics actually applies the velocity.
-    if (!(m->action & ACT_FLAG_AIR) && m->action != ACT_WALKING && m->action != ACT_RUNNING)
+    if (!(m->action & ACT_FLAG_AIR) && m->action != ACT_WALKING)
         set_mario_action(m, ACT_WALKING, 0);
 
     sWindFrames--;
