@@ -387,6 +387,8 @@ static const C_ComboboxOption kDiffOptions[] = {
 
 
 #ifdef RE_DEBUG
+static C_WidgetConfig sDebugBtnConfigs[RDEV_COUNT];
+
 static void re_debug_fire_event(int idx) {
     sPendingDebugEvent = idx;
 }
@@ -464,11 +466,10 @@ static void setup_ui(void) {
     C_AddWidget("Random Events", 1, "Debug", &sep2);
 
     for (int i = 0; i < RDEV_COUNT; i++) {
-        C_WidgetConfig btn = {0};
-        btn.type     = C_WIDGET_BUTTON;
-        btn.callback = kDebugFire[i];
-        btn.opts.generic.tooltip = "Fire this event immediately (must be in-game).";
-        C_AddWidget("Random Events", 1, kMessages[i], &btn);
+        sDebugBtnConfigs[i].type                 = C_WIDGET_BUTTON;
+        sDebugBtnConfigs[i].callback             = kDebugFire[i];
+        sDebugBtnConfigs[i].opts.generic.tooltip = "Fire this event immediately (must be in-game).";
+        C_AddWidget("Random Events", 1, kMessages[i], &sDebugBtnConfigs[i]);
     }
 #endif
 }
