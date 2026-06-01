@@ -57,7 +57,8 @@ static void tick_hit_reactions(struct MarioState *m) {
         }
         m->pos[1]       = sDodgeSrcY;
         m->faceAngle[1] += 0x8000; // face back toward enemy
-        set_mario_action(m, ACT_KICKING, 0);
+        set_mario_action(m, ACT_SLIDE_KICK, 0);
+        mario_set_forward_vel(e->m, 50.0f);
         sDodgePending = 0;
     }
 
