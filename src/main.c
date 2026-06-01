@@ -371,17 +371,15 @@ static void draw_interval_sliders(void) {
     sIntervalSliderMin = CVarGetInteger("gRandomEvents.MinInterval", INTERVAL_MIN_DEFAULT);
     sIntervalSliderMax = CVarGetInteger("gRandomEvents.MaxInterval", INTERVAL_MAX_DEFAULT);
 
-    if (ImGui::SliderInt("Min Interval##slider", &sIntervalSliderMin, 10, sIntervalSliderMax, "%ds")) {
+    if (igSliderInt("Min Interval##slider", &sIntervalSliderMin, 10, sIntervalSliderMax, "%ds", 0)) {
         if (sIntervalSliderMin > sIntervalSliderMax) sIntervalSliderMin = sIntervalSliderMax;
         CVarSetInteger("gRandomEvents.MinInterval", sIntervalSliderMin);
     }
-    ImGui::SetItemTooltip("Minimum time between random events (10 to %ds)", sIntervalSliderMax);
 
-    if (ImGui::SliderInt("Max Interval##slider", &sIntervalSliderMax, sIntervalSliderMin, 300, "%ds")) {
+    if (igSliderInt("Max Interval##slider", &sIntervalSliderMax, sIntervalSliderMin, 300, "%ds", 0)) {
         if (sIntervalSliderMax < sIntervalSliderMin) sIntervalSliderMax = sIntervalSliderMin;
         CVarSetInteger("gRandomEvents.MaxInterval", sIntervalSliderMax);
     }
-    ImGui::SetItemTooltip("Maximum time between random events (%ds to 300s)", sIntervalSliderMin);
 }
 
 #ifdef RE_DEBUG
