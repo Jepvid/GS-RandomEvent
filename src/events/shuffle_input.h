@@ -9,7 +9,7 @@
 static const u16 kShuffleBtns[3]  = { A_BUTTON,   B_BUTTON,   Z_TRIG      };
 static const u16 kShuffleCBtns[4] = { U_CBUTTONS, D_CBUTTONS, L_CBUTTONS, R_CBUTTONS };
 
-static int sShuffleFrames      = 0;
+static RE_Timer sShuffleFrames = {0};
 static u16 sShuffleBtnMap[3];  // A/B/Z remapping
 static u16 sShuffleCMap[4];    // C-button remapping
 static int sShuffleStickFlipX  = 0; // invert X axis
@@ -25,7 +25,7 @@ static void fisher_yates(int *arr, int n) {
 
 static void do_shuffle_input(struct MarioState *m) {
     (void)m;
-    sShuffleFrames = rng_range(SHUFFLE_MIN, SHUFFLE_MAX);
+    re_timer_set(&sShuffleFrames, rng_range(SHUFFLE_MIN, SHUFFLE_MAX));
 
     int order3[3] = { 0, 1, 2 };
     fisher_yates(order3, 3);
@@ -43,7 +43,7 @@ static void do_shuffle_input(struct MarioState *m) {
 }
 
 static void apply_shuffle_input(struct Controller *c) {
-    if (sShuffleFrames <= 0) return;
+    if (!re_timer_active(&sShuffleFrames)) return;
 
     // --- Buttons: A/B/Z ---
     u16 orig_down    = c->buttonDown;
@@ -79,7 +79,7 @@ static void apply_shuffle_input(struct Controller *c) {
     c->stickX = sx;
     c->stickY = sy;
 
-    sShuffleFrames--;
+    re_timer_tick(&sShuffleFrames);
 }
 
 #endif // RE_EVENTS_SHUFFLE_INPUT_H

@@ -12,6 +12,7 @@
 // #define RE_DEBUG  // uncomment to enable debug UI in settings
 
 #include "rng.h"
+#include "timer.h"
 #include "events/coins.h"
 #include "events/movement.h"
 #include "events/health.h"
@@ -36,6 +37,7 @@
 #include "events/cam.h"
 #include "events/freeze.h"
 #include "events/shuffle_input.h"
+#include "events/bounce.h"
 
 #define RDEV_COIN_BONUS      0
 #define RDEV_COIN_PENALTY    1
@@ -74,7 +76,8 @@
 #define RDEV_FPS_MARIO      34
 #define RDEV_FREEZE         35
 #define RDEV_SHUFFLE        36
-#define RDEV_COUNT          37
+#define RDEV_BOUNCY         37
+#define RDEV_COUNT          38
 
 // Normal-difficulty base weights. Damage/death events are intentionally low (1-2).
 static const int kWeights[RDEV_COUNT] = {
@@ -115,6 +118,7 @@ static const int kWeights[RDEV_COUNT] = {
      3, /* FPS_MARIO      */
      7, /* FREEZE         */
      8, /* SHUFFLE        */
+     6, /* BOUNCY         */
 };
 
 // Harm level per event: 0=peaceful, 1=annoying, 2=harmful, 3=destructive
@@ -156,6 +160,7 @@ static const int kHarmLevel[RDEV_COUNT] = {
     1, /* FPS_MARIO      */
     1, /* FREEZE         */
     1, /* SHUFFLE        */
+    0, /* BOUNCY         */
 };
 
 // Multipliers per harm level per difficulty. Pure Chaos uses weight 1 for all events.
@@ -205,6 +210,7 @@ static const char *kMessages[RDEV_COUNT] = {
     "FPS MARIO",
     "FREEZE",
     "SHUFFLED",
+    "BOUNCY",
 };
 
 #define INTERVAL_MIN_DEFAULT   10  // seconds
@@ -217,10 +223,10 @@ static ListenerID sActionListenerID;
 static ListenerID sTextListenerID;
 static ListenerID sInputBlockListenerID;
 
-static int sFrameCount   = 0;
-static int sNextEvent    = 0;
-static int sDisplayTimer = 0;
-static const char *sDisplayMsg = NULL;
+static u32        sTickCount    = 0;   // entropy for RNG mixing
+static RE_Timer   sEventTimer   = {0}; // countdown to next event
+static RE_Timer   sDisplayTimer = {0}; // how long to show event name
+static const char *sDisplayMsg  = NULL;
 static int sPendingDebugEvent = -1;
 
 static int get_event_weight(int type) {
@@ -297,10 +303,11 @@ static void fire_event(int type) {
         case RDEV_FPS_MARIO:      do_fpsmario(m);       break;
         case RDEV_FREEZE:         do_freeze(m);         break;
         case RDEV_SHUFFLE:        do_shuffle_input(m);  break;
+        case RDEV_BOUNCY:         do_bounce_mode(m);    break;
     }
     LUSLOG_INFO("[RandomEvent] %s", kMessages[type]);
-    sDisplayMsg   = kMessages[type];
-    sDisplayTimer = DISPLAY_FRAMES;
+    sDisplayMsg = kMessages[type];
+    re_timer_set(&sDisplayTimer, DISPLAY_FRAMES);
 }
 
 // Advances the event timer and ticks sustained effects.
@@ -308,7 +315,7 @@ static void fire_event(int type) {
 static void on_block_input(IEvent *event) {
     (void)event;
     if (!gMarioState || !gMarioState->controller) return;
-    if (sNarcolepsy <= 0 && sFreezeTimer <= 0 && sSplatFreeze <= 0) return;
+    if (!re_timer_active(&sNarcolepsy) && !re_timer_active(&sFreezeTimer) && !re_timer_active(&sSplatFreeze)) return;
     struct Controller *c = gMarioState->controller;
     c->stickX        = 0.0f;
     c->stickY        = 0.0f;
@@ -319,7 +326,7 @@ static void on_block_input(IEvent *event) {
 static void on_shuffle_input(IEvent *event) {
     (void)event;
     if (!gMarioState || !gMarioState->controller) return;
-    if (sNarcolepsy > 0 || sFreezeTimer > 0 || sSplatFreeze > 0) return; // blocking takes priority
+    if (re_timer_active(&sNarcolepsy) || re_timer_active(&sFreezeTimer) || re_timer_active(&sSplatFreeze)) return;
     apply_shuffle_input(gMarioState->controller);
 }
 
@@ -329,23 +336,20 @@ static void on_timer_update(IEvent *event) {
         return;
     }
 
-    // Advance unconditionally so intangible states (bonks, deaths, cutscenes) don't stall the timer.
-    sFrameCount++;
-    sRandState ^= (unsigned int)sFrameCount * 2654435761u;
-    if (sDisplayTimer > 0)
-        sDisplayTimer--;
+    sTickCount++;
+    sRandState ^= sTickCount * 2654435761u;
+    re_timer_tick(&sDisplayTimer);
 
     if (!is_in_game()) return;
 
     struct MarioState *m = gMarioState;
 
 #ifdef RE_DEBUG
-    if (sPendingDebugEvent >= 0 && !is_in_castle()) {
+    if (sPendingDebugEvent >= 0) {
         int type = sPendingDebugEvent;
         sPendingDebugEvent = -1;
-        fire_event(type);
-    } else if (sPendingDebugEvent >= 0 && is_in_castle()) {
-        sPendingDebugEvent = -1; // discard silently
+        if (!is_in_castle())
+            fire_event(type);
     }
 #endif
 
@@ -359,23 +363,19 @@ static void on_timer_update(IEvent *event) {
     tick_mini_mario(m);
     tick_magnetism(m);
     tick_freeze(m);
+    tick_bounce(m);
 
     int iMin = CVarGetInteger("gRandomEvents.MinInterval", INTERVAL_MIN_DEFAULT) * 30;
     int iMax = CVarGetInteger("gRandomEvents.MaxInterval", INTERVAL_MAX_DEFAULT) * 30;
-    // Silently swap if inverted (no callback to enforce constraint).
-    if (iMin > iMax) {
-        int tmp = iMin;
-        iMin = iMax;
-        iMax = tmp;
-    }
+    if (iMin > iMax) { int tmp = iMin; iMin = iMax; iMax = tmp; }
 
-    if (sNextEvent == 0)
-        sNextEvent = sFrameCount + rng_range(iMin, iMax);
+    if (!re_timer_active(&sEventTimer))
+        re_timer_set(&sEventTimer, rng_range(iMin, iMax));
 
-    if (sFrameCount >= sNextEvent && !is_in_castle()) {
-        int type = pick_event();
-        fire_event(type);
-        sNextEvent = sFrameCount + rng_range(iMin, iMax);
+    if (re_timer_tick(&sEventTimer) == 0) {
+        if (!is_in_castle())
+            fire_event(pick_event());
+        re_timer_set(&sEventTimer, rng_range(iMin, iMax));
     }
 }
 
@@ -384,7 +384,6 @@ static void on_action_tick(IEvent *event) {
     if (!gMarioState) return;
     struct MarioState *m = gMarioState;
 
-    tick_action_triggers(m);
     tick_splat(m);
     tick_clingy(m);
     tick_hit_reactions(m);
@@ -393,7 +392,7 @@ static void on_action_tick(IEvent *event) {
 }
 
 static void on_render_labels(IEvent *event) {
-    if (sDisplayTimer > 0 && sDisplayMsg)
+    if (re_timer_active(&sDisplayTimer) && sDisplayMsg)
         print_text_centered(160, 140, sDisplayMsg);
     if (sChaseWarning)
         print_text_centered(160, 165, sChaseWarning);
@@ -424,7 +423,7 @@ DEF_EVENT_FIRE(15) DEF_EVENT_FIRE(16) DEF_EVENT_FIRE(17) DEF_EVENT_FIRE(18) DEF_
 DEF_EVENT_FIRE(20) DEF_EVENT_FIRE(21) DEF_EVENT_FIRE(22) DEF_EVENT_FIRE(23) DEF_EVENT_FIRE(24)
 DEF_EVENT_FIRE(25) DEF_EVENT_FIRE(26) DEF_EVENT_FIRE(27) DEF_EVENT_FIRE(28) DEF_EVENT_FIRE(29)
 DEF_EVENT_FIRE(30) DEF_EVENT_FIRE(31) DEF_EVENT_FIRE(32) DEF_EVENT_FIRE(33) DEF_EVENT_FIRE(34)
-DEF_EVENT_FIRE(35) DEF_EVENT_FIRE(36)
+DEF_EVENT_FIRE(35) DEF_EVENT_FIRE(36) DEF_EVENT_FIRE(37)
 #undef DEF_EVENT_FIRE
 
 static void (*const kDebugFire[RDEV_COUNT])(void) = {
@@ -435,7 +434,7 @@ static void (*const kDebugFire[RDEV_COUNT])(void) = {
     re_fire_20, re_fire_21, re_fire_22, re_fire_23, re_fire_24,
     re_fire_25, re_fire_26, re_fire_27, re_fire_28, re_fire_29,
     re_fire_30, re_fire_31, re_fire_32, re_fire_33, re_fire_34,
-    re_fire_35, re_fire_36,
+    re_fire_35, re_fire_36, re_fire_37,
 };
 #endif
 
@@ -504,6 +503,7 @@ MOD_INIT() {
     sTextListenerID       = REGISTER_LISTENER(RenderTextLabels, EVENT_PRIORITY_NORMAL, on_render_labels);
     sInputBlockListenerID = REGISTER_LISTENER(GameReadInput,    EVENT_PRIORITY_LOW,    on_block_input);
     REGISTER_LISTENER(GameReadInput, EVENT_PRIORITY_LOW, on_shuffle_input);
+    register_caps();
     register_action_triggers();
     register_enemy_kills();
     register_chase_1up();
@@ -514,6 +514,7 @@ MOD_INIT() {
     register_cannon();
     register_kaizo();
     register_cam();
+    register_bounce();
 }
 
 MOD_EXIT() {
@@ -522,6 +523,7 @@ MOD_EXIT() {
     UNREGISTER_LISTENER(GameFrameUpdate,  sActionListenerID);
     UNREGISTER_LISTENER(RenderTextLabels, sTextListenerID);
     UNREGISTER_LISTENER(GameReadInput,    sInputBlockListenerID);
+    unregister_caps();
     unregister_action_triggers();
     unregister_enemy_kills();
     unregister_chase_1up();
@@ -532,4 +534,5 @@ MOD_EXIT() {
     unregister_cannon();
     unregister_kaizo();
     unregister_cam();
+    unregister_bounce();
 }

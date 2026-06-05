@@ -6,6 +6,7 @@
 
 static ListenerID sHitListenerID;
 static ListenerID sKnockbackListenerID;
+static ListenerID sTornadoListenerID;
 
 static int   sDodgePending = 0;
 static f32   sDodgeSrcX, sDodgeSrcY, sDodgeSrcZ;
@@ -74,14 +75,24 @@ static void tick_hit_reactions(struct MarioState *m) {
     }
 }
 
+// ~20% chance on bounce: launch Mario into a twirling spin instead of normal bounce.
+static void on_enemy_bounce(IEvent *event) {
+    PlayerBounceOnEnemy *e = (PlayerBounceOnEnemy *)event;
+    if (rng_next() % 5 != 0) return;
+    e->m->vel[1] = (f32)rng_range(60, 120);
+    set_mario_action(e->m, ACT_TWIRLING, 0);
+}
+
 static void register_hit_reactions(void) {
-    sHitListenerID       = REGISTER_LISTENER(PlayerHit,       EVENT_PRIORITY_HIGH, on_player_hit);
-    sKnockbackListenerID = REGISTER_LISTENER(PlayerKnockback, EVENT_PRIORITY_HIGH, on_player_knockback);
+    sHitListenerID       = REGISTER_LISTENER(PlayerHit,           EVENT_PRIORITY_HIGH,   on_player_hit);
+    sKnockbackListenerID = REGISTER_LISTENER(PlayerKnockback,     EVENT_PRIORITY_HIGH,   on_player_knockback);
+    sTornadoListenerID   = REGISTER_LISTENER(PlayerBounceOnEnemy, EVENT_PRIORITY_NORMAL, on_enemy_bounce);
 }
 
 static void unregister_hit_reactions(void) {
-    UNREGISTER_LISTENER(PlayerHit,       sHitListenerID);
-    UNREGISTER_LISTENER(PlayerKnockback, sKnockbackListenerID);
+    UNREGISTER_LISTENER(PlayerHit,           sHitListenerID);
+    UNREGISTER_LISTENER(PlayerKnockback,     sKnockbackListenerID);
+    UNREGISTER_LISTENER(PlayerBounceOnEnemy, sTornadoListenerID);
 }
 
 #endif // RE_EVENTS_HIT_REACTIONS_H

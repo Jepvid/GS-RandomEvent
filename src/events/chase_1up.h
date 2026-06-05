@@ -12,21 +12,21 @@
 #define CHASE_WARN_FAR_SQ  (500.0f * 500.0f)
 
 static struct Object *sChase1Up     = NULL;
-static int            sChaseTimer   = 0;
-static int            sChaseDelay   = 0;
+static RE_Timer       sChaseTimer   = {0};
+static RE_Timer       sChaseDelay   = {0};
 static const char    *sChaseWarning = NULL;
 
 static ListenerID sGreenDemonLivesListenerID;
 
 static void on_lives_change_green_demon(IEvent *event) {
     PlayerLivesChange *e = (PlayerLivesChange *)event;
-    if (!sChase1Up || sChaseTimer <= 0) return;
+    if (!sChase1Up || !re_timer_active(&sChaseTimer)) return;
     if (e->lives <= 0) return;
 
     e->Event.Cancelled = true;
     obj_mark_for_deletion(sChase1Up);
     sChase1Up     = NULL;
-    sChaseTimer   = 0;
+    re_timer_set(&sChaseTimer, 0);
     sChaseWarning = NULL;
     level_trigger_warp(e->m, WARP_OP_DEATH);
 }
@@ -34,16 +34,14 @@ static void on_lives_change_green_demon(IEvent *event) {
 static void do_chase_1up(struct MarioState *m) {
     (void)m;
     sChase1Up     = NULL;
-    sChaseTimer   = 0;
-    sChaseDelay   = CHASE_WARN_FRAMES;
+    re_timer_set(&sChaseTimer, 0);
+    re_timer_set(&sChaseDelay, CHASE_WARN_FRAMES);
     sChaseWarning = "GREEN DEMON";
 }
 
 static void tick_chase_1up(struct MarioState *m) {
-    // Pre-spawn warning phase: delay before the 1-up appears.
-    if (sChaseDelay > 0) {
-        sChaseDelay--;
-        if (sChaseDelay == 0 && m->marioObj && !is_in_castle()) {
+    if (re_timer_active(&sChaseDelay)) {
+        if (re_timer_tick(&sChaseDelay) == 0 && m->marioObj && !is_in_castle()) {
             sChase1Up = spawn_object_abs_with_rot(
                 m->marioObj, 0, MODEL_1UP, bhvHidden1upInPole,
                 (s16)(m->pos[0] + 400.0f),
@@ -52,17 +50,17 @@ static void tick_chase_1up(struct MarioState *m) {
                 0, 0, 0
             );
             if (!sChase1Up) { sChaseWarning = NULL; return; }
-            sChase1Up->oAction = 3; // spin animation → auto-transitions to chase
-            sChaseTimer = CHASE_DURATION;
+            sChase1Up->oAction = 3;
+            re_timer_set(&sChaseTimer, CHASE_DURATION);
         }
         return;
     }
 
-    if (sChaseTimer <= 0 || !sChase1Up) return;
+    if (!re_timer_active(&sChaseTimer) || !sChase1Up) return;
 
     if (!(sChase1Up->oFlags & ACTIVE_FLAG_ACTIVE)) {
         sChase1Up = sChaseWarning = NULL;
-        sChaseTimer = 0;
+        re_timer_set(&sChaseTimer, 0);
         return;
     }
 
@@ -73,8 +71,7 @@ static void tick_chase_1up(struct MarioState *m) {
                   : distSq < CHASE_WARN_FAR_SQ  ? "IT FOLLOWS"
                   :                                "GREEN DEMON";
 
-    sChaseTimer--;
-    if (sChaseTimer == 0) {
+    if (re_timer_tick(&sChaseTimer) == 0) {
         obj_mark_for_deletion(sChase1Up);
         sChase1Up = sChaseWarning = NULL;
     }

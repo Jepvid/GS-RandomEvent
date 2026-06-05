@@ -8,33 +8,33 @@
 
 #define CAM_DURATION 600
 
-static int sTopDownFrames = 0;
-static int sDjiFrames     = 0;
-static int sFpsFrames     = 0;
-static u16 sDjiAngle      = 0;
+static RE_Timer sTopDownFrames = {0};
+static RE_Timer sDjiFrames     = {0};
+static RE_Timer sFpsFrames     = {0};
+static u16      sDjiAngle      = 0;
 
 static ListenerID sCamListenerID;
 
 static void do_topdown(struct MarioState *m) {
     (void)m;
-    sTopDownFrames = CAM_DURATION;
-    sDjiFrames     = 0;
-    sFpsFrames     = 0;
+    re_timer_set(&sTopDownFrames, CAM_DURATION);
+    re_timer_set(&sDjiFrames,     0);
+    re_timer_set(&sFpsFrames,     0);
 }
 
 static void do_djicam(struct MarioState *m) {
     (void)m;
-    sTopDownFrames = 0;
-    sDjiFrames     = CAM_DURATION;
-    sFpsFrames     = 0;
-    sDjiAngle      = 0;
+    re_timer_set(&sTopDownFrames, 0);
+    re_timer_set(&sDjiFrames,     CAM_DURATION);
+    re_timer_set(&sFpsFrames,     0);
+    sDjiAngle = 0;
 }
 
 static void do_fpsmario(struct MarioState *m) {
     (void)m;
-    sTopDownFrames = 0;
-    sDjiFrames     = 0;
-    sFpsFrames     = CAM_DURATION;
+    re_timer_set(&sTopDownFrames, 0);
+    re_timer_set(&sDjiFrames,     0);
+    re_timer_set(&sFpsFrames,     CAM_DURATION);
 }
 
 // Sets all four lakitu fields so the smooth-approach system doesn't fight our override.
@@ -50,22 +50,22 @@ static void on_camera_update(IEvent *event) {
     if (!gMarioState) return;
     struct MarioState *m = gMarioState;
 
-    if (sTopDownFrames > 0) {
+    if (re_timer_active(&sTopDownFrames)) {
         cam_set(
             m->pos[0], m->pos[1] + 1200.0f, m->pos[2],
             m->pos[0], m->pos[1],            m->pos[2]
         );
-        sTopDownFrames--;
+        re_timer_tick(&sTopDownFrames);
 
-    } else if (sDjiFrames > 0) {
-        sDjiAngle += 200; // ~1 orbit per 327 frames
+    } else if (re_timer_active(&sDjiFrames)) {
+        sDjiAngle += 200;
         cam_set(
             m->pos[0] + sins(sDjiAngle) * 700.0f, m->pos[1] + 300.0f, m->pos[2] + coss(sDjiAngle) * 700.0f,
             m->pos[0],                             m->pos[1] + 80.0f,  m->pos[2]
         );
-        sDjiFrames--;
+        re_timer_tick(&sDjiFrames);
 
-    } else if (sFpsFrames > 0) {
+    } else if (re_timer_active(&sFpsFrames)) {
         f32 headY = m->pos[1] + 120.0f;
         f32 ld    = 400.0f;
         cam_set(
@@ -76,7 +76,7 @@ static void on_camera_update(IEvent *event) {
             headY,
             m->pos[2] + coss(m->faceAngle[1]) * ld
         );
-        sFpsFrames--;
+        re_timer_tick(&sFpsFrames);
     }
 }
 

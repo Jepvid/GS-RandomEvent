@@ -6,27 +6,25 @@
 // ~17% chance on pole grab: refuse to let go for 2-10 seconds.
 
 static ListenerID    sClingyListenerID;
-static int           sClingyTimer = 0;
+static RE_Timer      sClingyTimer = {0};
 static struct Object *sClingyPole = NULL;
 
-static void on_action_clingy(IEvent *event) {
-    PlayerSetAction *e = (PlayerSetAction *)event;
-    if (e->action != ACT_GRAB_POLE_SLOW && e->action != ACT_GRAB_POLE_FAST) return;
-    if (rng_next() % 6 != 0) return; // ~17%
-    sClingyPole  = e->m->usedObj;
-    sClingyTimer = rng_range(60, 300); // 2-10 seconds
+static void on_pole_grabbed(IEvent *event) {
+    PoleGrabbed *e = (PoleGrabbed *)event;
+    if (rng_next() % 6 != 0) return;
+    sClingyPole = e->pole;
+    re_timer_set(&sClingyTimer, rng_range(60, 300));
 }
 
 static void tick_clingy(struct MarioState *m) {
-    if (sClingyTimer <= 0 || !sClingyPole) return;
+    if (!re_timer_active(&sClingyTimer) || !sClingyPole) return;
 
     if (!(sClingyPole->oFlags & ACTIVE_FLAG_ACTIVE)) {
         sClingyPole  = NULL;
-        sClingyTimer = 0;
+        re_timer_set(&sClingyTimer, 0);
         return;
     }
 
-    // If Mario left the pole, snap him back onto it.
     if (!(m->action & ACT_FLAG_ON_POLE)) {
         m->usedObj  = sClingyPole;
         m->pos[0]   = sClingyPole->oPosX;
@@ -34,17 +32,16 @@ static void tick_clingy(struct MarioState *m) {
         set_mario_action(m, ACT_CLIMBING_POLE, 0);
     }
 
-    sClingyTimer--;
-    if (sClingyTimer == 0)
+    if (re_timer_tick(&sClingyTimer) == 0)
         sClingyPole = NULL;
 }
 
 static void register_clingy(void) {
-    sClingyListenerID = REGISTER_LISTENER(PlayerSetAction, EVENT_PRIORITY_NORMAL, on_action_clingy);
+    sClingyListenerID = REGISTER_LISTENER(PoleGrabbed, EVENT_PRIORITY_NORMAL, on_pole_grabbed);
 }
 
 static void unregister_clingy(void) {
-    UNREGISTER_LISTENER(PlayerSetAction, sClingyListenerID);
+    UNREGISTER_LISTENER(PoleGrabbed, sClingyListenerID);
 }
 
 #endif // RE_EVENTS_CLINGY_H

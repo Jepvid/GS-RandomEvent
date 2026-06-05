@@ -7,15 +7,15 @@
 #define MAGNET_RADIUS   1500.0f
 #define MAGNET_SPEED       5.0f
 
-static int sMagnetFrames = 0;
+static RE_Timer sMagnetFrames = {0};
 
 static void do_magnetism(struct MarioState *m) {
     (void)m;
-    sMagnetFrames = MAGNET_DURATION;
+    re_timer_set(&sMagnetFrames, MAGNET_DURATION);
 }
 
 static void tick_magnetism(struct MarioState *m) {
-    if (sMagnetFrames <= 0) return;
+    if (!re_timer_active(&sMagnetFrames)) return;
 
     for (int i = 0; i < OBJECT_POOL_CAPACITY; i++) {
         struct Object *o = &gObjectPool[i];
@@ -39,7 +39,7 @@ static void tick_magnetism(struct MarioState *m) {
         o->oPosZ += dz * inv;
     }
 
-    sMagnetFrames--;
+    re_timer_tick(&sMagnetFrames);
 }
 
 #endif // RE_EVENTS_MAGNETISM_H

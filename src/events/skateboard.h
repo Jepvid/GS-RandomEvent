@@ -6,7 +6,7 @@
 
 #define SKATE_DURATION 300 // 10 seconds
 
-static int            sSkateTimer = 0;
+static RE_Timer       sSkateTimer = {0};
 static struct Object *sSkateShell = NULL;
 
 static void do_skateboard(struct MarioState *m) {
@@ -22,15 +22,15 @@ static void do_skateboard(struct MarioState *m) {
 
     m->riddenObj = sSkateShell;
     set_mario_action(m, ACT_RIDING_SHELL_GROUND, 0);
-    sSkateTimer = SKATE_DURATION;
+    re_timer_set(&sSkateTimer, SKATE_DURATION);
 }
 
 static void tick_skateboard(struct MarioState *m) {
-    if (sSkateTimer <= 0) return;
+    if (!re_timer_active(&sSkateTimer)) return;
 
     if (!sSkateShell || !(sSkateShell->oFlags & ACTIVE_FLAG_ACTIVE)) {
         sSkateShell = NULL;
-        sSkateTimer = 0;
+        re_timer_set(&sSkateTimer, 0);
         return;
     }
 
@@ -39,9 +39,7 @@ static void tick_skateboard(struct MarioState *m) {
         set_mario_action(m, ACT_RIDING_SHELL_GROUND, 0);
     }
 
-    sSkateTimer--;
-
-    if (sSkateTimer == 0) {
+    if (re_timer_tick(&sSkateTimer) == 0) {
         m->riddenObj = NULL;
         sSkateShell  = NULL;
     }

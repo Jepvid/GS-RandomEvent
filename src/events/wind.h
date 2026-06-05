@@ -8,7 +8,7 @@
 #define WIND_ACCEL    3.0f
 #define WIND_VEL_CAP  60.0f
 
-static int sWindFrames = 0;
+static RE_Timer sWindFrames = {0};
 static f32 sWindDirX   = 0.0f;
 static f32 sWindDirZ   = 0.0f;
 
@@ -17,11 +17,11 @@ static void do_wind(struct MarioState *m) {
     u16 angle  = (u16)rng_range(0, 65535);
     sWindDirX  = sins(angle);
     sWindDirZ  = coss(angle);
-    sWindFrames = WIND_DURATION;
+    re_timer_set(&sWindFrames, WIND_DURATION);
 }
 
 static void tick_wind(struct MarioState *m) {
-    if (sWindFrames <= 0) return;
+    if (!re_timer_active(&sWindFrames)) return;
 
     m->vel[0] += sWindDirX * WIND_ACCEL;
     m->vel[2] += sWindDirZ * WIND_ACCEL;
@@ -39,7 +39,7 @@ static void tick_wind(struct MarioState *m) {
     if (!(m->action & ACT_FLAG_AIR) && m->action != ACT_WALKING)
         set_mario_action(m, ACT_WALKING, 0);
 
-    sWindFrames--;
+    re_timer_tick(&sWindFrames);
 }
 
 #endif // RE_EVENTS_WIND_H

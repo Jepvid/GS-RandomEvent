@@ -3,19 +3,18 @@
 
 #include "audio/external.h"
 
-static int sNarcolepsy   = 0;
-static int sNuhUhFrames  = 0;
-static int sRunFrames    = 0;
-static int sFireFrames   = 0;
+static RE_Timer sNarcolepsy  = {0};
+static RE_Timer sNuhUhFrames = {0};
+static RE_Timer sRunFrames   = {0};
 
 static void do_narcolepsy(struct MarioState *m) {
     (void)m;
-    sNarcolepsy = 90;
+    re_timer_set(&sNarcolepsy, 90);
 }
 
 static void do_nuh_uh(struct MarioState *m) {
     (void)m;
-    sNuhUhFrames = 150;
+    re_timer_set(&sNuhUhFrames, 150);
 }
 
 // Cannon launch in random direction with random power.
@@ -40,36 +39,33 @@ static void do_fire(struct MarioState *m) {
     play_sound(SOUND_MARIO_ON_FIRE, m->marioObj->header.gfx.cameraToObject);
     set_mario_action(m, ACT_BURNING_FALL, 0);
     m->vel[1] = 60.0f;
-    sFireFrames = 0;
 }
 
 // "Cant stop running" — locks Mario into a run at high speed for 10 seconds.
 static void do_speed_boost(struct MarioState *m) {
     (void)m;
-    sRunFrames = 300;
+    re_timer_set(&sRunFrames, 300);
 }
 
 static void tick_movement_states(struct MarioState *m) {
-    if (sNarcolepsy > 0) {
-        if (sNarcolepsy == 90 && !(m->action & ACT_FLAG_AIR))
+    if (re_timer_active(&sNarcolepsy)) {
+        if (sNarcolepsy.remaining == 90 && !(m->action & ACT_FLAG_AIR))
             set_mario_action(m, ACT_SLEEPING, 0);
-        // Pin position and block all input so mario cant run away.
         m->vel[0]      = 0.0f;
         m->vel[1]      = 0.0f;
         m->vel[2]      = 0.0f;
         m->forwardVel  = 0.0f;
         m->intendedMag = 0.0f;
-        sNarcolepsy--;
+        re_timer_tick(&sNarcolepsy);
     }
 
-    if (sNuhUhFrames > 0) {
+    if (re_timer_active(&sNuhUhFrames)) {
         if (m->action & ACT_FLAG_ATTACKING)
             set_mario_action(m, ACT_IDLE, 0);
-        sNuhUhFrames--;
+        re_timer_tick(&sNuhUhFrames);
     }
 
-    if (sRunFrames > 0) {
-        // Force Mario into a run if he's on the ground.
+    if (re_timer_active(&sRunFrames)) {
         if (!(m->action & ACT_FLAG_AIR) && !(m->action & ACT_FLAG_SWIMMING)) {
             if (m->action != ACT_WALKING)
                 set_mario_action(m, ACT_WALKING, 0);
@@ -77,7 +73,7 @@ static void tick_movement_states(struct MarioState *m) {
             m->intendedYaw = m->faceAngle[1];
             m->intendedMag = 32.0f;
         }
-        sRunFrames--;
+        re_timer_tick(&sRunFrames);
     }
 }
 
